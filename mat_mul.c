@@ -6,7 +6,7 @@
 struct matrix {
 	int ncols;
 	int nrows;
-	int* mat;
+	double* mat;
 };
 
 void readMatrix(struct matrix* m, FILE* file);
@@ -16,11 +16,11 @@ void matrixMul(struct matrix* m1, struct matrix* m2, struct matrix* m3);
 void readMatrix(struct matrix* m, FILE* file) {
 	int i, j;
 
-	m->mat = (int*)malloc(m->ncols * m->nrows * sizeof(int));
+	m->mat = (double*)malloc(m->ncols * m->nrows * sizeof(double));
 
 	for (i = 0; i < m->nrows; i++) {
 		for (j = 0; j < m->ncols; j++) {
-			fscanf(file, "%d", &m->mat[i * m->ncols + j]);
+			fscanf(file, "%lf", &m->mat[i * m->ncols + j]);
 		}
 	}
 }
@@ -30,7 +30,7 @@ void printMatrix(struct matrix* m, FILE* file) {
 
 	for (i = 0; i < m->nrows; i++) {
 		for (j = 0; j < m->ncols; j++) {
-			fprintf(file, "%d ", m->mat[i * m->ncols + j]);
+			fprintf(file, "%lf ", m->mat[i * m->ncols + j]);
 		}
 		fprintf(file, "\n");
 	}
@@ -42,9 +42,9 @@ void matrixMul(struct matrix* m1, struct matrix* m2, struct matrix* m3) {
 	m3->nrows = m1->nrows;
 	m3->ncols = m2->ncols;
 
-	m3->mat = (int*)malloc(m3->nrows * m3->ncols * sizeof(int));
+	m3->mat = (double*)malloc(m3->nrows * m3->ncols * sizeof(double));
 
-	memset(m3->mat, 0, m3->nrows * m3->ncols * sizeof(int));
+	memset(m3->mat, 0, m3->nrows * m3->ncols * sizeof(double));
 
 	for (i = 0; i < m1->nrows; i++) {
 		for (j = 0; j < m2->ncols; j++) {

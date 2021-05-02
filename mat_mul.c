@@ -4,81 +4,93 @@
 #include <time.h>
 
 struct matrix {
-	int ncol;
-	int nrow;
+	int ncols;
+	int nrows;
 	int* mat;
 };
 
-void readMatrix(struct matrix* m, char* filename);
-void printMatrice(struct matrix* m, char* filename);
+void readMatrix(struct matrix* m, FILE* file);
+void printMatrice(struct matrix* m, FILE* file);
 void matrixMul(struct matrix* m1, struct matrix* m2, struct matrix* m3);
 
-void readMatrix(struct matrix* m, char* filename) {
-	FILE* file;
+void readMatrix(struct matrix* m, FILE* file) {
 	int i, j;
 
-	file = fopen(filename, "r");
+	m->mat = (int*)malloc(m->ncols * m->nrows * sizeof(int));
 
-	fscanf(file, "%d %d", &m->nrow, &m->ncol);
-
-	m->mat = (int*)malloc(m->ncol * m->nrow * sizeof(int));
-
-	for (i = 0; i < m->nrow; i++) {
-		for (j = 0; j < m->ncol; j++) {
-			fscanf(file, "%d", &m->mat[i * m->ncol + j]);
+	for (i = 0; i < m->nrows; i++) {
+		for (j = 0; j < m->ncols; j++) {
+			fscanf(file, "%d", &m->mat[i * m->ncols + j]);
 		}
 	}
-	fclose(file);
 }
 
-void printMatrix(struct matrix* m) {
-	FILE* file;
+void printMatrix(struct matrix* m, FILE* file) {
 	int i, j;
 
-	file = fopen("result.txt", "w");
-
-	for (i = 0; i < m->nrow; i++) {
-		for (j = 0; j < m->ncol; j++) {
-			fprintf(file, "%d ", m->mat[i * m->ncol + j]);
+	for (i = 0; i < m->nrows; i++) {
+		for (j = 0; j < m->ncols; j++) {
+			fprintf(file, "%d ", m->mat[i * m->ncols + j]);
 		}
 		fprintf(file, "\n");
 	}
-	fclose(file);
 }
 
 void matrixMul(struct matrix* m1, struct matrix* m2, struct matrix* m3) {
 	int i, j, k;
 
-	m3->nrow = m1->nrow;
-	m3->ncol = m2->ncol;
+	m3->nrows = m1->nrows;
+	m3->ncols = m2->ncols;
 
-	m3->mat = (int*)malloc(m3->nrow * m3->ncol * sizeof(int));
+	m3->mat = (int*)malloc(m3->nrows * m3->ncols * sizeof(int));
 
-	memset(m3->mat, 0, m3->nrow * m3->ncol * sizeof(int));
+	memset(m3->mat, 0, m3->nrows * m3->ncols * sizeof(int));
 
-	for (i = 0; i < m1->nrow; i++) {
-		for (j = 0; j < m2->ncol; j++) {
-			for (k = 0; k < m1->ncol; k++) {
-				m3->mat[i * m3->ncol + j] += m1->mat[i*m1->ncol+k] * m2->mat[k*m2->ncol+j];
+	for (i = 0; i < m1->nrows; i++) {
+		for (j = 0; j < m2->ncols; j++) {
+			for (k = 0; k < m1->ncols; k++) {
+				m3->mat[i * m3->ncols + j] += m1->mat[i*m1->ncols+k] * m2->mat[k*m2->ncols+j];
 			}
 		}
 	}
 }
 
 int main(int argc, char* argv[]) {
+	if(argc != 3){
+		printf("Parameter error.");
+		exit(1);
+	}
+
+	FILE *mat1, *mat2, *resultFile;
   clock_t t;
 	struct matrix m1, m2, m3;
 
-	readMatrix(&m1, argv[1]);
-	readMatrix(&m2, argv[2]);
+	mat1 = fopen(argv[1], "r");
+	mat2 = fopen(argv[2], "r");
+	fscanf(mat1, "%d %d", &m1.nrows, &m1.ncols);
+	fscanf(mat2, "%d %d", &m2.nrows, &m2.ncols);
+
+	if(m1.ncols != m2.nrows){
+		printf("It is not possible to do matrix multiplication. Check matrix number of rows and cols.");
+		fclose(mat1);
+		fclose(mat2);
+		exit(1);
+	}
+	readMatrix(&m1, mat1);
+	readMatrix(&m2, mat2);
 
   t = clock();
 	matrixMul(&m1, &m2, &m3);
   t = clock() - t;
-	printMatrix(&m3);
+
+	resultFile = fopen("result.txt", "w");
+	printMatrix(&m3, resultFile);
 
   printf("Elapsed time: %f seconds", ((double)t)/CLOCKS_PER_SEC);
 
+	fclose(mat1);
+	fclose(mat2);
+	fclose(resultFile);
 	free(m1.mat);
 	free(m2.mat);
 	free(m3.mat);

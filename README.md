@@ -24,13 +24,20 @@ The first row contains the size of the matrix, number of rows and columns respec
 ### mat_mul.c
 
 1) Open a terminal in the project directory <br>
-
 2) Compile the source code by running: <br>
 ``` gcc -O3  mat_mul.c ``` <br>
-
 3) Run the program by running: <br>
 ``` a.exe [mat1] [mat2] ```
 
     Arguments:
     * mat1 (**required**): a txt file with the first matrix.
     * mat2 (**required**): second txt file with the other matrix.
+
+### mat_gen.py
+
+1) Open a terminal in the project directory <br>
+2) Run the program by running: <br>
+``` python3 mat_gen.py [dimension1] [dimension2]... ```
+
+        Arguments:
+        * dimension (**required**): matrix dimension (e.g. 3x3).

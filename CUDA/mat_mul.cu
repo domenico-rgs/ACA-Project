@@ -5,7 +5,7 @@
 #include "cuda_runtime.h"
 //#include "cuda_profiler_api.h"
 
-#define TILE_WIDTH 2
+#define THREADS 32
 
 struct matrix {
 	int ncols;
@@ -15,7 +15,7 @@ struct matrix {
 
 void readMatrix(struct matrix* m, FILE* file);
 void printMatrice(struct matrix* m, FILE* file);
-void matrixMul(struct matrix* m1, struct matrix* m2, struct matrix* m3);
+__global__ void matrixMul(double *d_m1, double *d_m2, double *d_m3, int row1, int col1, int col2);
 
 /*
 Knowing the number of rows and columns,
@@ -51,15 +51,18 @@ void printMatrix(struct matrix* m, FILE* file) {
 Performs the multiplication operation between the matrices m1 and m2.
 The result will be stored in the matrix m3.
 */
-__global__ void matrixMul(double *d_m1, double *d_m2, double *d_m3, int width){
-  int row = blockIdx.y*TILE_WIDTH + threadIdx.y;
-  int col = blockIdx.x*TILE_WIDTH + threadIdx.x;
+__global__ void matrixMul(double *d_m1, double *d_m2, double *d_m3, int row1, int col1, int col2){
+	int i = blockIdx.y*blockDim.y+threadIdx.y;
+  int j = blockIdx.x*blockDim.x+threadIdx.x;
 
-  double Pvalue=0;
-  for(int k=0; k<width; k++){
-    Pvalue += d_m1[row*width+k]+d_m2[k*width+col];
+	double sum = 0;
+
+	if ((i < row1) && (j < col2)){
+		for(int k=0; k<col1; k++){
+			sum += d_m1[i*col1+k]*d_m2[k*col2+j];
+		}
+		d_m3[i*col2+j]=sum;
   }
-  d_m3[row*width+col]=Pvalue;
 }
 
 int main(int argc, char* argv[]) {
@@ -99,11 +102,13 @@ int main(int argc, char* argv[]) {
   cudaMemcpy(d_m1, m1.mat, m1.nrows*m1.ncols * sizeof(double), cudaMemcpyHostToDevice);
   cudaMemcpy(d_m2, m2.mat, m2.nrows*m2.ncols * sizeof(double), cudaMemcpyHostToDevice);
 
-  dim3 dimGrid(m1.nrows/TILE_WIDTH, m1.nrows/TILE_WIDTH);
-  dim3 dimBlock(TILE_WIDTH, TILE_WIDTH);
+	printf("block=%d\n", block_x);
+
+	dim3 dimBlock(THREADS, THREADS);
+	dim3 dimGrid((m2.ncols+dimBlock.x-1)/dimBlock.x, (m1.nrows+dimBlock.y-1)/dimBlock.y);
 
 	t = clock();
-  matrixMul <<<dimGrid, dimBlock>>>(d_m1, d_m2, d_m3, m1.nrows);
+  matrixMul <<<dimGrid, dimBlock>>>(d_m1, d_m2, d_m3, m1.nrows, m2.nrows, m1.ncols, m2.ncols);
 	t = clock() - t; //total time spent in matrixMul
 
 	resultFile = fopen("result.txt", "w");

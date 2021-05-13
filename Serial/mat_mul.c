@@ -55,11 +55,12 @@ void matrixMul(struct matrix* m1, struct matrix* m2, struct matrix* m3) {
 
 	//dynamically allocates the m3-matrix to be used to save the result
 	m3->mat = (double*)malloc(m3->nrows * m3->ncols * sizeof(double));
-	memset(m3->mat, 0, m3->nrows * m3->ncols * sizeof(double));
+	memset(m3->mat, 0, m3->nrows * m3->ncols * sizeof(double)); //set the memory allocated to the m3 matrix to zero
 
+	//classical multiplication done with a summation
 	for (i = 0; i < m1->nrows; i++) {
 		for (j = 0; j < m2->ncols; j++) {
-			for (k = 0; k < m1->ncols; k++) {
+			for (k = 0; k < m1->ncols; k++) { 
 				m3->mat[i * m3->ncols + j] += m1->mat[i*m1->ncols+k] * m2->mat[k*m2->ncols+j]; //"Linearisation" of matrices is used to achieve faster access due to the principle of access locality.
 			}
 		}

@@ -5,7 +5,7 @@
 #include "cuda_runtime.h"
 //#include "cuda_profiler_api.h"
 
-#define THREADS 32
+#define THREADS 32 //In each block THREADS*THREADS threads
 
 struct matrix {
 	int ncols;
@@ -14,8 +14,8 @@ struct matrix {
 };
 
 void readMatrix(struct matrix* m, FILE* file);
-void printMatrice(struct matrix* m, FILE* file);
-__global__ void matrixMul(double *d_m1, double *d_m2, double *d_m3, int row1, int col1, int col2);
+void printMatrix(struct matrix* m, FILE* file);
+__global__ void matrixMul(double *d_m1, double *d_m2, double *d_m3, int row1, int row2, int col1, int col2);
 
 /*
 Knowing the number of rows and columns,
@@ -51,12 +51,13 @@ void printMatrix(struct matrix* m, FILE* file) {
 Performs the multiplication operation between the matrices m1 and m2.
 The result will be stored in the matrix m3.
 */
-__global__ void matrixMul(double *d_m1, double *d_m2, double *d_m3, int row1, int col1, int col2){
+__global__ void matrixMul(double *d_m1, double *d_m2, double *d_m3, int row1, int row2, int col1, int col2){
 	int i = blockIdx.y*blockDim.y+threadIdx.y;
-  int j = blockIdx.x*blockDim.x+threadIdx.x;
+	int j = blockIdx.x*blockDim.x+threadIdx.x;
 
 	double sum = 0;
-
+	
+	//the two previous for cycle are substituted by the matrix of threads
 	if ((i < row1) && (j < col2)){
 		for(int k=0; k<col1; k++){
 			sum += d_m1[i*col1+k]*d_m2[k*col2+j];
@@ -90,29 +91,30 @@ int main(int argc, char* argv[]) {
 
 	readMatrix(&m1, mat1);
 	readMatrix(&m2, mat2);
+	
+	m3.nrows=m1.nrows;
+	m3.ncols=m2.ncols;
+	
+	//cudaProfilerStart();
 
-  //cudaProfilerStart();
+	/* Device variable, allocations, and transfers */
+	double *d_m1, *d_m2, *d_m3;
+	cudaMalloc((void**)&d_m1, sizeof(double) * m1.nrows*m1.ncols);
+	cudaMalloc((void**)&d_m2, sizeof(double) * m2.nrows*m2.ncols);
+	cudaMalloc((void**)&d_m3, sizeof(double) * m3.nrows*m3.ncols);
 
-  /* Device variable, allocations, and transfers */
-  double *d_m1, *d_m2, *d_m3;
-  cudaMalloc((void**)&d_m1, sizeof(double) * m1.nrows*m1.ncols);
-  cudaMalloc((void**)&d_m2, sizeof(double) * m2.nrows*m2.ncols);
-  cudaMalloc((void**)&d_m3, sizeof(double) * m3.nrows*m3.ncols);
-
-  cudaMemcpy(d_m1, m1.mat, m1.nrows*m1.ncols * sizeof(double), cudaMemcpyHostToDevice);
-  cudaMemcpy(d_m2, m2.mat, m2.nrows*m2.ncols * sizeof(double), cudaMemcpyHostToDevice);
-
-	printf("block=%d\n", block_x);
+	cudaMemcpy(d_m1, m1.mat, m1.nrows*m1.ncols * sizeof(double), cudaMemcpyHostToDevice);
+	cudaMemcpy(d_m2, m2.mat, m2.nrows*m2.ncols * sizeof(double), cudaMemcpyHostToDevice);
 
 	dim3 dimBlock(THREADS, THREADS);
 	dim3 dimGrid((m2.ncols+dimBlock.x-1)/dimBlock.x, (m1.nrows+dimBlock.y-1)/dimBlock.y);
 
 	t = clock();
-  matrixMul <<<dimGrid, dimBlock>>>(d_m1, d_m2, d_m3, m1.nrows, m2.nrows, m1.ncols, m2.ncols);
+	matrixMul <<<dimGrid, dimBlock>>>(d_m1, d_m2, d_m3, m1.nrows, m2.nrows, m1.ncols, m2.ncols);
 	t = clock() - t; //total time spent in matrixMul
 
 	resultFile = fopen("result.txt", "w");
-  cudaMemcpy(d_m3, m3.mat, m3.nrows*m3.ncols * sizeof(double), cudaMemcpyDeviceToHost);
+	cudaMemcpy(d_m3, m3.mat, m3.nrows*m3.ncols * sizeof(double), cudaMemcpyDeviceToHost);
 	printMatrix(&m3, resultFile);
 
 	printf("Elapsed time: %f seconds", ((double)t)/CLOCKS_PER_SEC);
@@ -121,14 +123,14 @@ int main(int argc, char* argv[]) {
 	fclose(mat2);
 	fclose(resultFile);
 
-  cudaFree(d_m1);
-  cudaFree(d_m2);
-  cudaFree(d_m3);
+	cudaFree(d_m1);
+	cudaFree(d_m2);
+	cudaFree(d_m3);
 
 	free(m1.mat);
 	free(m2.mat);
 	free(m3.mat);
 
-  //cudaProfilerStop();
+	//cudaProfilerStop();
 	return 0;
 }

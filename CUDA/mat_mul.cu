@@ -114,7 +114,7 @@ int main(int argc, char* argv[]) {
 	t = clock() - t; //total time spent in matrixMul
 
 	resultFile = fopen("result.txt", "w");
-	cudaMemcpy(d_m3, m3.mat, m3.nrows*m3.ncols * sizeof(double), cudaMemcpyDeviceToHost);
+	cudaMemcpy(m3.mat, d_m3, m3.nrows*m3.ncols * sizeof(double), cudaMemcpyDeviceToHost);
 	printMatrix(&m3, resultFile);
 
 	printf("Elapsed time: %f seconds", ((double)t)/CLOCKS_PER_SEC);

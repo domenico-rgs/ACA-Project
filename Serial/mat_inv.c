@@ -48,13 +48,7 @@ int computeDeterminant(const struct matrix* m) {
 	int i, j, k, ratio;
 	float det = 1;
 	double* mat = (double*)malloc(m->ncols * m->nrows * sizeof(double));
-	memcpy(mat, m->mat, m->nrows * m->ncols);
-	
-	for (i = 0; i < m->nrows; i++) {
-		for (j = 0; i < m->ncols; j++) {
-			printf("%f", m->mat[i * m->ncols + j]);
-		}
-	}
+	mat = memcpy(mat, m->mat, m->nrows * m->ncols * sizeof(double));
 	
 	/* Using Gauss Elimination technique for transforming matrix to upper triangular matrix */
 	for (i = 0; i < m->nrows; i++) {

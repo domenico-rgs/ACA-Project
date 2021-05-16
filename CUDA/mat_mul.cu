@@ -116,6 +116,7 @@ int main(int argc, char* argv[]) {
 
 	t = clock();
 	matrixMul <<<dimGrid, dimBlock>>>(d_m1, d_m2, d_m3, m1.nrows, m2.nrows, m1.ncols, m2.ncols);
+	cudaDeviceSynchronize();
 	t = clock() - t; //total time spent in matrixMul
 
 	cudaMemcpy(m3.mat, d_m3, m3.nrows*m3.ncols * sizeof(double), cudaMemcpyDeviceToHost);

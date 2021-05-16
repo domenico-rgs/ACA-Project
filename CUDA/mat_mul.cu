@@ -56,10 +56,11 @@ __global__ void matrixMul(double *d_m1, double *d_m2, double *d_m3, int row1, in
 	int j = blockIdx.x*blockDim.x+threadIdx.x;
 
 	double sum = 0;
-	
+	int k;
+
 	//the two previous for cycle are substituted by the matrix of threads
 	if ((i < row1) && (j < col2)){
-		for(int k=0; k<col1; k++){
+		for(k = 0; k<col1; k++){
 			sum += d_m1[i*col1+k]*d_m2[k*col2+j];
 		}
 		d_m3[i*col2+j]=sum;
@@ -83,7 +84,7 @@ int main(int argc, char* argv[]) {
 
 	//Multiplication is permitted if m1 is m x n and m2 is n x p.
 	if(m1.ncols != m2.nrows){
-		printf("It is not possible to do matrix multiplication. Check matrix number of rows and cols.");
+		printf("It is not possible to do matrix multiplication. Check matrices number of rows and cols.");
 		fclose(mat1);
 		fclose(mat2);
 		exit(1);
@@ -91,20 +92,24 @@ int main(int argc, char* argv[]) {
 
 	readMatrix(&m1, mat1);
 	readMatrix(&m2, mat2);
-	
+
+	//M3 initilization
 	m3.nrows=m1.nrows;
 	m3.ncols=m2.ncols;
-	
+	m3.mat = (double*)malloc(m3.ncols * m3.nrows * sizeof(double));
+
 	//cudaProfilerStart();
 
 	/* Device variable, allocations, and transfers */
 	double *d_m1, *d_m2, *d_m3;
-	cudaMalloc((void**)&d_m1, sizeof(double) * m1.nrows*m1.ncols);
-	cudaMalloc((void**)&d_m2, sizeof(double) * m2.nrows*m2.ncols);
-	cudaMalloc((void**)&d_m3, sizeof(double) * m3.nrows*m3.ncols);
+	cudaMalloc((void**)&d_m1, m1.nrows*m1.ncols*sizeof(double));
+	cudaMalloc((void**)&d_m2, m2.nrows*m2.ncols*sizeof(double));
+	cudaMalloc((void**)&d_m3, m3.nrows*m3.ncols*sizeof(double));
 
 	cudaMemcpy(d_m1, m1.mat, m1.nrows*m1.ncols * sizeof(double), cudaMemcpyHostToDevice);
 	cudaMemcpy(d_m2, m2.mat, m2.nrows*m2.ncols * sizeof(double), cudaMemcpyHostToDevice);
+
+	cudaMemset(d_m3, 0, m3.nrows*m3.ncols*sizeof(double));
 
 	dim3 dimBlock(THREADS, THREADS);
 	dim3 dimGrid((m2.ncols+dimBlock.x-1)/dimBlock.x, (m1.nrows+dimBlock.y-1)/dimBlock.y);
@@ -113,24 +118,26 @@ int main(int argc, char* argv[]) {
 	matrixMul <<<dimGrid, dimBlock>>>(d_m1, d_m2, d_m3, m1.nrows, m2.nrows, m1.ncols, m2.ncols);
 	t = clock() - t; //total time spent in matrixMul
 
-	resultFile = fopen("result.txt", "w");
 	cudaMemcpy(m3.mat, d_m3, m3.nrows*m3.ncols * sizeof(double), cudaMemcpyDeviceToHost);
-	printMatrix(&m3, resultFile);
-
-	printf("Elapsed time: %f seconds", ((double)t)/CLOCKS_PER_SEC);
-
-	fclose(mat1);
-	fclose(mat2);
-	fclose(resultFile);
 
 	cudaFree(d_m1);
 	cudaFree(d_m2);
 	cudaFree(d_m3);
 
+	//cudaProfilerStop();
+
+	resultFile = fopen("result.txt", "w");
+	printMatrix(&m3, resultFile);
+
+	printf("Elapsed time: %.5lf seconds", ((double)t)/CLOCKS_PER_SEC);
+
+	fclose(mat1);
+	fclose(mat2);
+	fclose(resultFile);
+
 	free(m1.mat);
 	free(m2.mat);
 	free(m3.mat);
 
-	//cudaProfilerStop();
 	return 0;
 }

@@ -11,9 +11,11 @@ struct matrix {
 };
 
 void readMatrix(struct matrix* m, FILE* file);
-void storeMatrix(struct matrix* m, FILE* file);
-void matrixInversion(struct matrix* m1, struct matrix* m2);
-double computeDeterminant(struct matrix* m);
+void storeMatrix(double *squared_matrix, int n, FILE* file);
+double determinant(double *m, int n);
+void getCofactor(double *m, double *cofact, int p, int q, int n);
+void adjoint(struct matrix *m, double *adj);
+void inverse(struct matrix *m, double *inv, double det);
 
 /*
 	Reads a matrix from a file and stores it into the appropriate structure.
@@ -33,78 +35,104 @@ void readMatrix(struct matrix* m, FILE* file) {
 /*
 	Stores a matrix into the file passed as argument
 */
-void storeMatrix(struct matrix* m, FILE* file) {
+void storeMatrix(double *squared_matrix, int n, FILE* file) {
 	int i, j;
 
-	for (i = 0; i < m->nrows; i++) {
-		for (j = 0; j < m->ncols; j++) {
-			fprintf(file, "%lf ", m->mat[i * m->ncols + j]);
+	for (i = 0; i < n; i++) {
+		for (j = 0; j < n; j++) {
+			fprintf(file, "%lf ", squared_matrix[i * n + j]);
 		}
 		fprintf(file, "\n");
 	}
 }
 
-/* https://www.codesansar.com/c-programming-examples/matrix-determinant.htm */
-double computeDeterminant(struct matrix* m) {
-	int i, j, k, ratio;
-	double det = 1;
-	double* mat;
+double determinant(double *m, int n){
+	double d = 0; // Initialize result
+	
+	//  Base case : if matrix contains single element
+	if (n == 1){
+		return m[0];
+	}
 
-	mat = (double*)malloc(m->ncols * m->nrows * sizeof(double));
-	memcpy(mat, m->mat, m->nrows * m->ncols * sizeof(double)); //necessary in order not to change the read matrix into an upper triangular one
+	int sign = 1, f;  // To store sign multiplier
+	double *cofact = (double*)malloc(n * n * sizeof(double));  // cofact is used to store cofactors of m
 
-	/* Using Gauss Elimination technique for transforming matrix to upper triangular matrix */
-	for (i = 0; i < m->nrows; i++) {
-	 	if (mat[i * m->ncols + i] == 0) {
-			free(mat);
-			return HUGE_VAL;
-		}
-		
-		for (j = i+1 ; j < m->nrows; j++) {
-			ratio = mat[j * m->ncols + i] / mat[i * m->ncols + i];
+	// Iterate for each element of first row
+	for (f = 0; f < n; f++){
+		// Getting Cofactor of A[0][f]
+		getCofactor(m, cofact, 0, f, n);
 
-			for (k = 0; k < m->nrows; k++) {
-				mat[j * m->ncols + k] = mat[j * m->ncols + k] - ratio * mat[i * m->ncols + k];
+		d += sign * m[f] * determinant(cofact, n - 1);
+
+		// terms are to be added with alternate sign
+		sign = -sign;
+	}
+	
+	free(cofact);
+	return d;
+}
+
+void getCofactor(double *m, double *cofact, int p, int q, int n){
+	int i = 0, j = 0, row, col;
+
+	// Looping for each element of the matrix
+	for (row = 0; row < n; row++){
+		for (col = 0; col < n; col++){
+			//  Copying into temporary matrix only those element
+			//  which are not in given row and column
+			if (row != p && col != q){
+				cofact[i * n + (j++)] = m[row * n + col];
+				// Row is filled, so increase row index and
+				// reset col index
+				if (j == n - 1){
+					j = 0;
+					i++;
+				}
 			}
 		}
 	}
-
-	printf("\nUpper Triangular Matrix: \n");
-	 for(i=0;i< m->nrows;i++)
-	 {
-		  for(j=0;j< m->nrows;j++)
-		  {
-			   printf("%0.2f\t",mat[i*m->ncols+j]);
-		  }
-		  printf("\n");
-	 }
-
-	/* Finding determinant by multiplying elements in principal diagonal elements */
-	for (i = 0; i < m->nrows; i++) {
-        det = det * mat[i * m->ncols + i];
-    }
-
-    free(mat);
-    return det;
 }
 
-/*
-	Performs the inversion of the matrix m by using Jacobi algorithm
-*/
-void matrixInversionJacobi(struct matrix* m) {
-	int i, j, k;
+void adjoint(struct matrix *m, double *adj){
+	if (m->nrows == 1) {
+		adj[0] = 1;
+		return;
+	}
 
-	/* Jacobi Algorithm */
+	int sign = 1, i, j;
+	double *cofact = (double*)malloc(m->ncols * m->nrows * sizeof(double));  // cofact is used to store cofactors of m.mat
 
+	for (i=0; i<m->nrows; i++){
+		for (j=0; j<m->ncols; j++){
+			// Get cofactor of A[i][j]
+			getCofactor(m->mat, cofact, i, j, m->nrows);
+
+			// sign of adj[j][i] positive if sum of row
+			// and column indexes is even.
+			sign = ((i+j)%2==0)? 1: -1;
+
+			// Interchanging rows and columns to get the
+			// transpose of the cofactor matrix
+			adj[j * m->ncols + i] = (sign)*(determinant(cofact, m->nrows-1));
+		}
+	}
+	free(cofact);
 }
 
-/*
-	Performs the inversion of the matrix m by using Gauss-Seidel algorithm
-*/
-void matrixInversionGauss(struct matrix* m) {
-	int i, j, k;
+void inverse(struct matrix *m, double *inv, double det){
+	int i, j;
 
-	/* Gauss-Seidel Algorithm */
+	// Find adjoint
+	double *adj = (double*)malloc(m->ncols * m->nrows * sizeof(double));
+	adjoint(m, adj);
+
+	// Find Inverse using formula "inverse(A) = adj(A)/det(A)"
+	for (i=0; i<m->nrows; i++){
+		for (j=0; j<m->ncols; j++){
+			inv[i*m->ncols +j] = adj[i*m->ncols + j]/(det);
+		}
+	}
+	free(adj);
 }
 
 int main(int argc, char* argv[]) {
@@ -122,16 +150,11 @@ int main(int argc, char* argv[]) {
 	fscanf(mat, "%d %d", &m.nrows, &m.ncols);
 	readMatrix(&m, mat);
 
-	det = computeDeterminant(&m);
+	det = determinant(m.mat, m.nrows);
+	printf("Determinant of the matrix: %f \n", det);
 
 	/* Checking if it is possible to perform the matrix inversion */
-	if(det == HUGE_VAL){
-		printf("ERROR: Mathematical error in determinant calculation\n");
-		fclose(mat);
-		fclose(resultFile);
-		free(m.mat);
-		exit(1);
-	}else if (det == 0 || (m.nrows != m.ncols)) {
+	if (det == 0 || (m.nrows != m.ncols)) {
 		printf("ERROR: It is not possible to compute the inversion: determinant is equal to 0 or the matrix is not squared\n");
 		fclose(mat);
 		fclose(resultFile);
@@ -139,19 +162,20 @@ int main(int argc, char* argv[]) {
 		exit(1);
 	}
 
-	printf("Determinant of the matrix: %f \n", det);
+	double *inv =(double*)malloc(m.ncols * m.nrows * sizeof(double));
 
 	t = clock();
-	matrixInversionJacobi(&m);
+	inverse(&m, inv, det);
 	t = clock() - t;
 
 	resultFile = fopen("inverse.txt", "w");
-	storeMatrix(&m, resultFile);
+	storeMatrix(inv, m.nrows, resultFile);
 
 	printf("\nElapsed time: %lf seconds\n", ((double)t) / CLOCKS_PER_SEC);
 
 	fclose(mat);
 	fclose(resultFile);
+	free(inv);
 	free(m.mat);
 
 	return 0;

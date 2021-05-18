@@ -15,10 +15,10 @@ void storeMatrix(double *squared_matrix, int n, FILE* file);
 double determinant(double *m, int n);
 void getCofactor(double *m, double *cofact, int p, int q, int n);
 void adjoint(struct matrix *m, double *adj);
-void inverse(struct matrix *m, double *inverse, double det);
+void inverse(struct matrix *m, double *inv, double det);
 
 /*
-Reads a matrix from a file and stores it into the appropriate structure.
+	Reads a matrix from a file and stores it into the appropriate structure.
 */
 void readMatrix(struct matrix* m, FILE* file) {
 	int i, j;
@@ -33,7 +33,7 @@ void readMatrix(struct matrix* m, FILE* file) {
 }
 
 /*
-Stores a matrix into the file passed as argument
+	Stores a matrix into the file passed as argument
 */
 void storeMatrix(double *squared_matrix, int n, FILE* file) {
 	int i, j;
@@ -48,25 +48,27 @@ void storeMatrix(double *squared_matrix, int n, FILE* file) {
 
 double determinant(double *m, int n){
 	double d = 0; // Initialize result
-
+	
 	//  Base case : if matrix contains single element
-	if (n == 1)
-	return m[0];
-
-	double *cofact = (double*)malloc(n * n * sizeof(double));  // cofact is used to store cofactors of A[][]
+	if (n == 1){
+		return m[0];
+	}
 
 	int sign = 1, f;  // To store sign multiplier
+	double *cofact = (double*)malloc(n * n * sizeof(double));  // cofact is used to store cofactors of m
 
 	// Iterate for each element of first row
 	for (f = 0; f < n; f++){
 		// Getting Cofactor of A[0][f]
 		getCofactor(m, cofact, 0, f, n);
+
 		d += sign * m[f] * determinant(cofact, n - 1);
 
 		// terms are to be added with alternate sign
 		sign = -sign;
 	}
-
+	
+	free(cofact);
 	return d;
 }
 
@@ -79,8 +81,7 @@ void getCofactor(double *m, double *cofact, int p, int q, int n){
 			//  Copying into temporary matrix only those element
 			//  which are not in given row and column
 			if (row != p && col != q){
-				temp[i * n + (j++)] = A[row * n + col];
-
+				cofact[i * n + (j++)] = m[row * n + col];
 				// Row is filled, so increase row index and
 				// reset col index
 				if (j == n - 1){
@@ -93,19 +94,16 @@ void getCofactor(double *m, double *cofact, int p, int q, int n){
 }
 
 void adjoint(struct matrix *m, double *adj){
-	if (m->nrows == 1)
-	{
+	if (m->nrows == 1) {
 		adj[0] = 1;
 		return;
 	}
 
-	int sign = 1 i, j;
-	double *cofact = (double*)malloc(m->ncols * m->nrows * sizeof(double));  // cofact is used to store cofactors of A[][]
+	int sign = 1, i, j;
+	double *cofact = (double*)malloc(m->ncols * m->nrows * sizeof(double));  // cofact is used to store cofactors of m.mat
 
-	for (i=0; i<m->nrows; i++)
-	{
-		for (j=0; j<m->ncols; j++)
-		{
+	for (i=0; i<m->nrows; i++){
+		for (j=0; j<m->ncols; j++){
 			// Get cofactor of A[i][j]
 			getCofactor(m->mat, cofact, i, j, m->nrows);
 
@@ -118,10 +116,12 @@ void adjoint(struct matrix *m, double *adj){
 			adj[j * m->ncols + i] = (sign)*(determinant(cofact, m->nrows-1));
 		}
 	}
+	free(cofact);
 }
 
-void inverse(struct matrix *m, double *inverse, double det){
+void inverse(struct matrix *m, double *inv, double det){
 	int i, j;
+
 	// Find adjoint
 	double *adj = (double*)malloc(m->ncols * m->nrows * sizeof(double));
 	adjoint(m, adj);
@@ -129,9 +129,10 @@ void inverse(struct matrix *m, double *inverse, double det){
 	// Find Inverse using formula "inverse(A) = adj(A)/det(A)"
 	for (i=0; i<m->nrows; i++){
 		for (j=0; j<m->ncols; j++){
-			inverse[i*m->ncols +j] = adj[i*m->ncols + j]/(double)(det);
+			inv[i*m->ncols +j] = adj[i*m->ncols + j]/(det);
 		}
 	}
+	free(adj);
 }
 
 int main(int argc, char* argv[]) {
@@ -149,7 +150,8 @@ int main(int argc, char* argv[]) {
 	fscanf(mat, "%d %d", &m.nrows, &m.ncols);
 	readMatrix(&m, mat);
 
-	det = determinant(&m);
+	det = determinant(m.mat, m.nrows);
+	printf("Determinant of the matrix: %f \n", det);
 
 	/* Checking if it is possible to perform the matrix inversion */
 	if (det == 0 || (m.nrows != m.ncols)) {
@@ -160,21 +162,20 @@ int main(int argc, char* argv[]) {
 		exit(1);
 	}
 
-	printf("Determinant of the matrix: %f \n", det);
-
-	double *inverse =(double*)malloc(m->ncols * m->nrows * sizeof(double));
+	double *inv =(double*)malloc(m.ncols * m.nrows * sizeof(double));
 
 	t = clock();
-	inverse(&m, inverse, det);
+	inverse(&m, inv, det);
 	t = clock() - t;
 
 	resultFile = fopen("inverse.txt", "w");
-	storeMatrix(inverse, m->nrows, resultFile);
+	storeMatrix(inv, m.nrows, resultFile);
 
 	printf("\nElapsed time: %lf seconds\n", ((double)t) / CLOCKS_PER_SEC);
 
 	fclose(mat);
 	fclose(resultFile);
+	free(inv);
 	free(m.mat);
 
 	return 0;

@@ -72,8 +72,9 @@ void LUPInvert(double *m, int *P, int n, double *inverseM) {
 		for (i = 0; i < n; i++) {
 			inverseM[i*n+j] = P[i] == j ? 1.0 : 0.0;
 
-			for (k = 0; k < i; k++)
-			inverseM[i*n+j] -= m[i*n+k] * inverseM[k*n+j];
+			for (k = 0; k < i; k++){
+				inverseM[i*n+j] -= m[i*n+k] * inverseM[k*n+j];
+			}
 		}
 
 		for (i = n - 1; i >= 0; i--) {
@@ -93,13 +94,15 @@ void LUPSolve(double *m, int *P, double *b, int n, double *x) {
 	for (i = 0; i < n; i++) {
 		x[i] = b[P[i]];
 
-		for (k = 0; k < i; k++)
-		x[i] -= m[i*n+k] * x[k];
+		for (k = 0; k < i; k++){
+			x[i] -= m[i*n+k] * x[k];
+		}
 	}
 
 	for (i = n - 1; i >= 0; i--) {
-		for (k = i + 1; k < n; k++)
-		x[i] -= m[i*n+k] * x[k];
+		for (k = i + 1; k < n; k++){
+			x[i] -= m[i*n+k] * x[k];
+		}
 
 		x[i] /= m[i*n+i];
 	}
@@ -117,17 +120,19 @@ int LUPDecompose(double *m, int n, double Tol, int *P) {
 	int i, j, k, imax;
 	double maxA, absA, temp;
 
-	for (i = 0; i <= n; i++)
-	P[i] = i; //Unit permutation matrix, P[N] initialized with N
+	for (i = 0; i <= n; i++){
+		P[i] = i; //Unit permutation matrix, P[N] initialized with N
+	}
 
 	for (i = 0; i < n; i++) {
 		maxA = 0.0;
 		imax = i;
 
-		for (k = i; k < n; k++)
-		if ((absA = fabs(m[k*n+i])) > maxA) {
-			maxA = absA;
-			imax = k;
+		for (k = i; k < n; k++){
+			if ((absA = fabs(m[k*n+i])) > maxA) {
+				maxA = absA;
+				imax = k;
+			}
 		}
 
 		if (maxA < Tol) return 0; //failure, matrix is degenerate
@@ -152,8 +157,9 @@ int LUPDecompose(double *m, int n, double Tol, int *P) {
 		for (j = i + 1; j < n; j++) {
 			m[j*n+i] /= m[i*n+i];
 
-			for (k = i + 1; k < n; k++)
-			m[j*n+k] -= m[j*n+i] * m[i*n+k];
+			for (k = i + 1; k < n; k++){
+				m[j*n+k] -= m[j*n+i] * m[i*n+k];
+			}
 		}
 	}
 
@@ -169,21 +175,19 @@ int main(int argc, char* argv[]) {
 	FILE *mat, *resultFile;
 	clock_t t;
 	struct matrix m;
-	double det;
 
 	mat = fopen(argv[1], "r");
 	fscanf(mat, "%d %d", &m.nrows, &m.ncols);
 	readMatrix(&m, mat);
 
 	/*
-	det = determinant(&m);
+	double det = determinant(&m);
 	printf("Determinant of the matrix: %f \n", det);
 	*/
 
 	if (m.nrows != m.ncols) {
 		printf("ERROR: It is not possible to compute the inversion: the matrix is not squared\n");
 		fclose(mat);
-		fclose(resultFile);
 		free(m.mat);
 		exit(1);
 	}
@@ -198,7 +202,7 @@ int main(int argc, char* argv[]) {
 	LUPDecompose(m.mat, m.nrows, 1E-3, P);
 	LUPSolve(m.mat, P, b, m.nrows, x);
 	LUPInvert(m.mat, P, m.nrows, inverseM);
-	
+
 	t = clock() - t;
 
 	printf("\nDeterminant: %lf\n", LUPDeterminant(m.mat, P, m.nrows));

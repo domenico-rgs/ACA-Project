@@ -180,11 +180,6 @@ int main(int argc, char* argv[]) {
 	fscanf(mat, "%d %d", &m.nrows, &m.ncols);
 	readMatrix(&m, mat);
 
-	/*
-	double det = determinant(&m);
-	printf("Determinant of the matrix: %f \n", det);
-	*/
-
 	if (m.nrows != m.ncols) {
 		printf("ERROR: It is not possible to compute the inversion: the matrix is not squared\n");
 		fclose(mat);
@@ -199,13 +194,25 @@ int main(int argc, char* argv[]) {
 
 	t = clock();
 
-	LUPDecompose(m.mat, m.nrows, 1E-3, P);
+	double check = LUPDecompose(m.mat, m.nrows, 1E-3, P);
+	
+	double det = LUPDeterminant(m.mat, P, m.nrows);
+	printf("\nDeterminant: %lf\n", det);
+	if (det == 0.0 || check == 0) {
+		printf("ERROR: It is not possible to compute the inversion\n");
+		fclose(mat);
+		free(P);
+		free(inverseM);		
+		free(x);
+		free(b);
+		free(m.mat);
+		exit(1);
+	}
+	
 	LUPSolve(m.mat, P, b, m.nrows, x);
 	LUPInvert(m.mat, P, m.nrows, inverseM);
 
 	t = clock() - t;
-
-	printf("\nDeterminant: %lf\n", LUPDeterminant(m.mat, P, m.nrows));
 
 	resultFile = fopen("inverse.txt", "w");
 	storeMatrix(inverseM, m.nrows, resultFile);

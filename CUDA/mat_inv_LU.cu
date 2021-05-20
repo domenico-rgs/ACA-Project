@@ -1,5 +1,3 @@
-/* https://en.wikipedia.org/wiki/LU_decomposition#C_code_example */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,12 +16,11 @@ struct matrix {
 
 void readMatrix(struct matrix* m, FILE* file);
 void storeMatrix(double *squared_matrix, int n, FILE* file);
-double determinant(double *m, int n);
-double LUPDeterminant(double *m, int *P, int n);
+__global__ double LUPDeterminant(double *m, int *P, int n);
 __global__ void LUPInvert(double *d_m, int *d_P, int n, double *d_inverseM);
 __global__ void LUPSolve(double *d_m, int *d_P, double *d_b, int n, double *d_x);
 __global__ void LUPSolve2(double *d_m, int n, double *d_x);
-__global__ void LUPDecompose(double *d_m, int n, double Tol, int *d_P);
+__global__ int LUPDecompose(double *d_m, int n, double Tol, int *d_P);
 
 /*
 Reads a matrix from a file and stores it into the appropriate structure.
@@ -57,7 +54,7 @@ void storeMatrix(double *squared_matrix, int n, FILE* file) {
 /* INPUT: A,P filled in LUPDecompose; N - dimension.
 * OUTPUT: Function returns the determinant of the initial matrix
 */
-__global__ double LUPDeterminant(double *d_m, int *d_P, int n){
+__global__ double LUPDeterminant(double *d_m, int *d_P, int n){ //parallel reduction ?
 	int i;
 	double det = d_m[0];
 
@@ -72,20 +69,24 @@ __global__ double LUPDeterminant(double *d_m, int *d_P, int n){
 * OUTPUT: IA is the inverse of the initial matrix
 */
 __global__ void LUPInvert(double *d_m, int *d_P, int n, double *d_inverseM) {
-	int i = blockIdx.y*blockDim.y+threadIdx.y;
-	int j = blockIdx.x*blockDim.x+threadIdx.x;
+	int i = blockIdx.x*blockDim.x+threadIdx.x;
+	int j = blockIdx.y*blockDim.y+threadIdx.y;
 
 	if((i<n) && (j<n)){
 		d_inverseM[i*n+j] = d_P[i] == j ? 1.0 : 0.0;
 	}
+	__syncthreads();
+
+	if((i<n) && (j<n)){
+		for (k = 0; k < i; k++){
+			d_inverseM[i*n+j] -= d_m[i*n+k] * d_inverseM[k*n+j];
+		}
+	}
 }
 
 __global__ void LUPInvert2(double *d_m, int n, double *d_inverseM) {
+	int j = blockIdx.x* THREADS + threadIdx.x;
 	int i, k;
-	for (k = 0; k < i; k++){
-		d_inverseM[i*n+j] -= d_m[i*n+k] * d_inverseM[k*n+j];
-	}
-
 		for (i = n - 1; i >= 0; i--) {
 			for (k = i + 1; k < n; k++){
 				d_inverseM[i*n+j] -= d_m[i*n+k] * d_inverseM[k*n+j];
@@ -103,19 +104,21 @@ __global__ void LUPSolve(double *d_m, int *d_P, double *d_b, int n, double *d_x)
 	if(i<n){
 		d_x[i] = d_b[d_P[i]];
 	}
+	__syncthreads();
+
+	if(i<n){
+		for (k = 0; k < i; k++){
+			d_x[i] -= d_m[i*n+k] * d_x[k];
+		}
+	}
 }
 
 	__global__ void LUPSolve2(double *d_m, int n, double *d_x) {
 		int i, k;
-		for (k = 0; k < i; k++){
-			d_x[i] -= d_m[i*n+k] * d_x[k];
-		}
-
 		for (i = n - 1; i >= 0; i--) {
 			for (k = i + 1; k < n; k++){
 				d_x[i] -= d_m[i*n+k] * d_x[k];
 			}
-
 			d_x[i] /= d_m[i*n+i];
 		}
 	}
@@ -127,7 +130,7 @@ __global__ void LUPSolve(double *d_m, int *d_P, double *d_b, int n, double *d_x)
 	*        containing column indexes where the permutation matrix has "1". The last element P[N]=S+N,
 	*        where S is the number of row exchanges needed for determinant computation, det(P)=(-1)^S
 	*/
-	__global__ void LUPDecompose(double *d_m, int n, double Tol, int *d_P) {
+	__global__ int LUPDecompose(double *d_m, int n, double Tol, int *d_P) {
 		int i, j, k, imax;
 		double maxA, absA, temp;
 
@@ -193,7 +196,6 @@ __global__ void LUPSolve(double *d_m, int *d_P, double *d_b, int n, double *d_x)
 		if (m.nrows != m.ncols) {
 		printf("ERROR: It is not possible to compute the inversion: the matrix is not squared\n");
 		fclose(mat);
-		fclose(resultFile);
 		free(m.mat);
 		exit(1);
 	}
@@ -230,7 +232,7 @@ __global__ void LUPSolve(double *d_m, int *d_P, double *d_b, int n, double *d_x)
 
 	t = clock();
 
-	double check = LUPDecompose <<<dimGridSingle, dimBlockSingle>>>(d_m, m.nrows, 1E-3, d_P);
+	int check = LUPDecompose <<<dimGridSingle, dimBlockSingle>>>(d_m, m.nrows, 1E-3, d_P);
 	double det = LUPDeterminant <<<dimGridSingle, dimBlockSingle>>>(d_m, d_P, m.nrows);
 
 	printf("\nDeterminant: %lf\n", det);
@@ -240,9 +242,9 @@ __global__ void LUPSolve(double *d_m, int *d_P, double *d_b, int n, double *d_x)
 		free(inverseM);
 		free(m.mat);
 		cudaFree(d_P);
-		cudaFree(inverseM);
-		cudaFree(x);
-		cudaFree(b);
+		cudaFree(d_inverseM);
+		cudaFree(d_x);
+		cudaFree(d_b);
 		cudaFree(m.mat);
 		exit(1);
 	}
@@ -250,7 +252,7 @@ __global__ void LUPSolve(double *d_m, int *d_P, double *d_b, int n, double *d_x)
 	LUPSolve <<<dimGrid, dimBlock>>>(d_m, d_P, d_b, m.nrows, d_x);
 	LUPSolve2 <<<dimGridSingle, dimBlockSingle>>>(d_m, m.nrows, d_x);
 	LUPInvert <<<dimGrid2, dimBlock2>>>(d_m, d_P, m.nrows, d_inverseM);
-	LUPInvert2 <<<dimGridSingle, dimBlocksingle>>>(d_m, m.nrows, d_inverseM);
+	LUPInvert2 <<<dimGrid, dimBlock>>>(d_m, m.nrows, d_inverseM);
 
 	cudaDeviceSynchronize();
 

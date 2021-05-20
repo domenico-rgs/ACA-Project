@@ -57,15 +57,15 @@ void storeMatrix(double *squared_matrix, int n, FILE* file) {
 /* INPUT: A,P filled in LUPDecompose; N - dimension.
 * OUTPUT: Function returns the determinant of the initial matrix
 */
-double LUPDeterminant(double *m, int *P, int n){
+__global__ double LUPDeterminant(double *d_m, int *d_P, int n){
 	int i;
-	double det = m[0];
+	double det = d_m[0];
 
 	for (i=1; i<n; i++){
-		det *= m[i*n+i];
+		det *= d_m[i*n+i];
 	}
 
-	return (P[n] - n) % 2 == 0 ? det : -det;
+	return (d_P[n] - n) % 2 == 0 ? det : -det;
 }
 
 /* INPUT: A,P filled in LUPDecompose; N - dimension
@@ -74,14 +74,17 @@ double LUPDeterminant(double *m, int *P, int n){
 __global__ void LUPInvert(double *d_m, int *d_P, int n, double *d_inverseM) {
 	int i = blockIdx.y*blockDim.y+threadIdx.y;
 	int j = blockIdx.x*blockDim.x+threadIdx.x;
-	int k;
 
-	if((i<n) && (j<n){
+	if((i<n) && (j<n)){
 		d_inverseM[i*n+j] = d_P[i] == j ? 1.0 : 0.0;
+	}
+}
 
-		for (k = 0; k < i; k++){
-			d_inverseM[i*n+j] -= d_m[i*n+k] * d_inverseM[k*n+j];
-		}
+__global__ void LUPInvert2(double *d_m, int n, double *d_inverseM) {
+	int i, k;
+	for (k = 0; k < i; k++){
+		d_inverseM[i*n+j] -= d_m[i*n+k] * d_inverseM[k*n+j];
+	}
 
 		for (i = n - 1; i >= 0; i--) {
 			for (k = i + 1; k < n; k++){
@@ -90,26 +93,24 @@ __global__ void LUPInvert(double *d_m, int *d_P, int n, double *d_inverseM) {
 			d_inverseM[i*n+j] /= d_m[i*n+i];
 		}
 	}
-}
 
 /* INPUT: A,P filled in LUPDecompose; b - rhs vector; N - dimension
 * OUTPUT: x - solution vector of A*x=b
 */
 __global__ void LUPSolve(double *d_m, int *d_P, double *d_b, int n, double *d_x) {
 	int i = blockIdx.x * THREADS + threadIdx.x;
-	int k;
 
 	if(i<n){
 		d_x[i] = d_b[d_P[i]];
-
-		for (k = 0; k < i; k++){
-			d_x[i] -= d_m[i*n+k] * d_x[k];
-		}
 	}
 }
 
 	__global__ void LUPSolve2(double *d_m, int n, double *d_x) {
 		int i, k;
+		for (k = 0; k < i; k++){
+			d_x[i] -= d_m[i*n+k] * d_x[k];
+		}
+
 		for (i = n - 1; i >= 0; i--) {
 			for (k = i + 1; k < n; k++){
 				d_x[i] -= d_m[i*n+k] * d_x[k];
@@ -139,7 +140,7 @@ __global__ void LUPSolve(double *d_m, int *d_P, double *d_b, int n, double *d_x)
 			imax = i;
 
 			for (k = i; k < n; k++){
-				if ((absA = fabs(m[k*n+i])) > maxA) {
+				if ((absA = fabs(d_m[k*n+i])) > maxA) {
 					maxA = absA;
 					imax = k;
 				}
@@ -172,6 +173,7 @@ __global__ void LUPSolve(double *d_m, int *d_P, double *d_b, int n, double *d_x)
 				}
 			}
 		}
+		return 1;
 	}
 
 	int main(int argc, char* argv[]) {
@@ -183,25 +185,18 @@ __global__ void LUPSolve(double *d_m, int *d_P, double *d_b, int n, double *d_x)
 		FILE *mat, *resultFile;
 		clock_t t;
 		struct matrix m;
-		double det;
 
 		mat = fopen(argv[1], "r");
 		fscanf(mat, "%d %d", &m.nrows, &m.ncols);
 		readMatrix(&m, mat);
 
-		/*
-		det = determinant(&m);
-
-		if (det == 0 || (m.nrows != m.ncols)) {
-		printf("ERROR: It is not possible to compute the inversion: determinant is equal to 0 or the matrix is not squared\n");
+		if (m.nrows != m.ncols) {
+		printf("ERROR: It is not possible to compute the inversion: the matrix is not squared\n");
 		fclose(mat);
 		fclose(resultFile);
 		free(m.mat);
 		exit(1);
 	}
-
-	printf("Determinant of the matrix: %f \n", det);
-	*/
 
 	double *inverseM = (double*)malloc(m.ncols * m.nrows * sizeof(double));
 
@@ -213,35 +208,53 @@ __global__ void LUPSolve(double *d_m, int *d_P, double *d_b, int n, double *d_x)
 
 	cudaMalloc((void**)&d_m, m.nrows*m.ncols*sizeof(double));
 	cudaMalloc((void**)&d_inverseM, m.nrows*m.ncols*sizeof(double));
-	cudaMalloc((void**)&d_P, m.nrows**sizeof(int) + 1 * sizeof(int));
+	cudaMalloc((void**)&d_P, m.nrows*sizeof(int) + 1 * sizeof(int));
 	cudaMalloc((void**)&d_x, m.nrows*sizeof(double));
 	cudaMalloc((void**)&d_b, m.nrows*sizeof(double));
 
 	cudaMemcpy(d_m, m.mat, m.nrows*m.ncols * sizeof(double), cudaMemcpyHostToDevice);
 
-	int block_x = nelem / THREADS;
-	if ((nelem) % THREADS != 0) {
+	int block_x = m.nrows / THREADS;
+	if ((m.nrows) % THREADS != 0) {
 		block_x++;
 	}
 
 	dim3 dimBlock(THREADS, 1, 1);
 	dim3 dimGrid(block_x, 1, 1);
 
+	dim3 dimBlockSingle(1, 1, 1);
+	dim3 dimGridSingle(1, 1, 1);
+
 	dim3 dimBlock2(THREADS, THREADS);
 	dim3 dimGrid2((m.ncols+dimBlock2.x-1)/dimBlock2.x, (m.nrows+dimBlock2.y-1)/dimBlock2.y);
 
 	t = clock();
 
-	LUPDecompose <<<(1,1,1), (1,1,1)>>>(d_m, m.nrows, 1E-3, d_P);
+	double check = LUPDecompose <<<dimGridSingle, dimBlockSingle>>>(d_m, m.nrows, 1E-3, d_P);
+	double det = LUPDeterminant <<<dimGridSingle, dimBlockSingle>>>(d_m, d_P, m.nrows);
+
+	printf("\nDeterminant: %lf\n", det);
+	if (det == 0.0 || check == 0) {
+		printf("ERROR: It is not possible to compute the inversion\n");
+		fclose(mat);
+		free(inverseM);
+		free(m.mat);
+		cudaFree(d_P);
+		cudaFree(inverseM);
+		cudaFree(x);
+		cudaFree(b);
+		cudaFree(m.mat);
+		exit(1);
+	}
+
 	LUPSolve <<<dimGrid, dimBlock>>>(d_m, d_P, d_b, m.nrows, d_x);
-	LUPSolve2 <<<(1,1,1), (1,1,1)>>>(d_m, m.nrows, d_x);
+	LUPSolve2 <<<dimGridSingle, dimBlockSingle>>>(d_m, m.nrows, d_x);
 	LUPInvert <<<dimGrid2, dimBlock2>>>(d_m, d_P, m.nrows, d_inverseM);
+	LUPInvert2 <<<dimGridSingle, dimBlocksingle>>>(d_m, m.nrows, d_inverseM);
 
 	cudaDeviceSynchronize();
 
 	t = clock() - t;
-
-	//printf("\nDeterminant: %lf\n", LUPDeterminant(m.mat, P, m.nrows));
 
 	cudaMemcpy(inverseM, d_inverseM, m.nrows*m.ncols * sizeof(double), cudaMemcpyDeviceToHost);
 

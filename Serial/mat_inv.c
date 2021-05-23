@@ -11,16 +11,13 @@ struct matrix {
 
 void readMatrix(struct matrix* m, FILE* file);
 void storeMatrix(double *squared_matrix, int n, FILE* file);
-double findDeterminant(double *a, int *p, int n);
+double determinant(double *l, double *u, int n);
 void forwardSubstitution(double *l, double *p, double *y, int column, int n);
 void backwardSubstitution(double *u, double *y, double *a_inv, int column, int n);
 void pivoting(double *a, double *p, int n);
 void lu(double *l, double *u, int n);
-void computeInverse(double *a, double *a_inv, int n);
 
-/*
- *	Reads a matrix from a file and stores it into the appropriate structure.
-*/
+/* Reads a matrix from a file and stores it into the appropriate structure. */
 void readMatrix(struct matrix* m, FILE* file) {
 	int i, j;
 
@@ -33,9 +30,7 @@ void readMatrix(struct matrix* m, FILE* file) {
 	}
 }
 
-/*
-	Stores a matrix into the file passed as argument
-*/
+/* Stores a matrix into the file passed as argument */
 void storeMatrix(double *squared_matrix, int n, FILE* file) {
 	int i, j;
 
@@ -47,16 +42,15 @@ void storeMatrix(double *squared_matrix, int n, FILE* file) {
 	}
 }
 
-/* TODO */
-double findDeterminant(double *a, int *p, int n) {
+double determinant(double *l, double *u, int n) {
 	int i;
-	double det = a[0];
+	double det = 1;
 
-	for (i = 1; i < n; i++) {
-		det *= a[i*n + i];
+	for(i=0; i<n; i++){
+			det *= l[i * n + i] * u[i * n + i];
 	}
-
-	return (p[n] - n) % 2 == 0 ? det : -det;
+	
+	return det;
 }
 
 void forwardSubstitution(double *l, double *p, double *y, int column, int n) {
@@ -132,11 +126,32 @@ void lu(double *l, double *u, int n) {
     }
 }
 
-void computeInverse(double *a, double *a_inv, int n) {
-    int i;
-    
-    /* Memory allocation of temporary matrix */
-    double *p = (double*)malloc(n * n * sizeof(double));
+int main(int argc, char* argv[]) {
+	if(argc != 2) { //Checking parameters: 1.mat_inv.exe 2.matrix 
+		printf("Parameters error.\n");
+		exit(1);
+	}
+
+	FILE *mat, *resultFile;
+	clock_t t;
+	struct matrix m;
+	int i;
+
+	mat = fopen(argv[1], "r");
+	fscanf(mat, "%d %d", &m.nrows, &m.ncols);
+	readMatrix(&m, mat);
+	
+	if (m.nrows != m.ncols) {
+		printf("ERROR: It is not possible to compute the inversion: the matrix is not squared\n");
+		fclose(mat);
+		free(m.mat);
+		exit(1);
+	}
+	
+	int n = m.nrows; //matrix order
+	
+	double *a_inv = (double*)malloc(n * n * sizeof(double));
+	double *p = (double*)malloc(n * n * sizeof(double));
 	double *l = (double*)malloc(n * n * sizeof(double));
 	double *a_p = (double*)malloc(n * n * sizeof(double));
 	double *u = (double*)malloc(n * n * sizeof(double));
@@ -147,83 +162,56 @@ void computeInverse(double *a, double *a_inv, int n) {
 	memset(a_inv, 0, n * n * sizeof(double));
 	memset(p, 0, n * n * sizeof(double));
 	memset(l, 0, n * n * sizeof(double));
-	memcpy(a_p, a, n * n * sizeof(double));
-
+	memcpy(a_p, m.mat, n * n * sizeof(double));
+	
 	for (i = 0; i < n; i++) {
         p[i * n + i] = 1;
 		l[i * n + i] = 1;
     }
-    
-    pivoting(a_p, p, n);
-
+   
+	t = clock();
+	pivoting(a_p, p, n);
+		
 	/* Creating matrix u using a_p */
 	memcpy(u, a_p, n * n * sizeof(double));
-
+	
 	/* Performing LU decomposition */
     lu(l, u, n);
-    
-    /* Finding the inverse, result is stored into a_inv */
+	
+	double det = determinant(l, u, n);
+	printf("Determinant: %lf\n", det);
+	if(det == 0.0){
+		printf("ERROR: It is not possible to compute the inversion: the matrix is not squared\n");
+		fclose(mat);
+		free(p);		
+		free(l);
+		free(u);
+		free(a_p);
+		free(y);
+		free(a_inv);		
+		free(m.mat);
+		exit(1);
+	}
+	
+	/* Finding the inverse, result is stored into a_inv */
 	for (i = 0; i < n; i++) {
         forwardSubstitution(l, p, y, i, n); 			// y is filled
         backwardSubstitution(u, y, a_inv, i, n);		// a_inv is filled
     }
-    
-    free(p);		
-	free(l);
-	free(u);
-	free(a_p);
-	free(y);
-}
-
-int main(int argc, char* argv[]) {
-	/* Checking parameters: 1.mat_inv.exe 2.matrix */
-	if(argc != 2) {
-		printf("Parameters error.\n");
-		exit(1);
-	}
-
-	FILE *mat, *resultFile;
-	clock_t t;
-	struct matrix m;
-	//int i, j;
-
-	mat = fopen(argv[1], "r");
-	fscanf(mat, "%d %d", &m.nrows, &m.ncols);
-	readMatrix(&m, mat);
-
-	if (m.nrows != m.ncols) {
-		printf("ERROR: It is not possible to compute the inversion: the matrix is not squared\n");
-		fclose(mat);
-		free(m.mat);
-		exit(1);
-	}
-	
-	/*	
-	double det = findDeterminant(m.mat, p, m.nrows);
-	printf("\nDeterminant: %lf\n", det);
-	if (det == 0.0) {
-		printf("ERROR: It is not possible to compute the inversion\n");
-		fclose(mat);
-		free(*a1);		
-		free(m.mat);
-		exit(1);
-	}
-	*/
-	
-	double *a_inv = (double*)malloc(m.nrows * m.ncols * sizeof(double));
-
-    
-	t = clock();
-	computeInverse(m.mat, a_inv, m.nrows);
 	t = clock() - t;
 	
 	resultFile = fopen("inverse.txt", "w");
-	storeMatrix(a_inv, m.nrows, resultFile);
+	storeMatrix(a_inv, n, resultFile);
 
 	printf("\nElapsed time: %lf seconds\n", ((double)t) / CLOCKS_PER_SEC);
 
 	fclose(mat);
 	fclose(resultFile);
+	free(p);		
+	free(l);
+	free(u);
+	free(a_p);
+	free(y);
 	free(a_inv);		
 	free(m.mat);
 

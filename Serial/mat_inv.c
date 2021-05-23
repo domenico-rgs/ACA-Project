@@ -133,7 +133,7 @@ void lu(double *l, double *u, int n) {
 }
 
 void computeInverse(double *a, double *a_inv, int n) {
-    int i, j;
+    int i;
     
     /* Memory allocation of temporary matrix */
     double *p = (double*)malloc(n * n * sizeof(double));
@@ -143,34 +143,21 @@ void computeInverse(double *a, double *a_inv, int n) {
 	double *y = (double*)malloc(n * sizeof(double));
     
 	/* Creating pivoting matrix and setting inverse matrix to 0 */
+	/* Creating matrix l and copying a into a_p */
+	memset(a_inv, 0, n * n * sizeof(double));
+	memset(p, 0, n * n * sizeof(double));
+	memset(l, 0, n * n * sizeof(double));
+	memcpy(a_p, a, n * n * sizeof(double));
+
 	for (i = 0; i < n; i++) {
         p[i * n + i] = 1;
-        for (j = 0; j < n; j++) {
-            a_inv[i*n+j] = 0;
-            if (i != j) {
-                p[i * n + j] = 0;
-            }
-        }
-    }
-    
-    /* Creating matrix l and copying a into a_p */
-    for (i = 0; i < n; i++) {
-        l[i * n + i] = 1;
-        for (j = 0; j < n; j++) {
-            a_p[i * n + j] = a[i*n + j];
-            if (i != j)
-                l[i * n + j] = 0;
-        }
+		l[i * n + i] = 1;
     }
     
     pivoting(a_p, p, n);
 
 	/* Creating matrix u using a_p */
-    for (i = 0; i < n; i++) {
-        for (j = 0; j < n; j++) {
-            u[i * n + j] = a_p[i * n + j];
-        }
-    }
+	memcpy(u, a_p, n * n * sizeof(double));
 
 	/* Performing LU decomposition */
     lu(l, u, n);

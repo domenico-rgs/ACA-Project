@@ -10,7 +10,7 @@ struct matrix {
 };
 
 void readMatrix(struct matrix* m, FILE* file);
-void storeMatrix(double *squared_matrix, int n, FILE* file);
+void printMatrix(double *squared_matrix, int n, FILE* file);
 double determinant(double *l, double *u, int n);
 void forwardSubstitution(double *l, double *p, double *y, int column, int n);
 void backwardSubstitution(double *u, double *y, double *a_inv, int column, int n);
@@ -31,7 +31,7 @@ void readMatrix(struct matrix* m, FILE* file) {
 }
 
 /* Stores a matrix into the file passed as argument */
-void storeMatrix(double *squared_matrix, int n, FILE* file) {
+void printMatrix(double *squared_matrix, int n, FILE* file) {
 	int i, j;
 
 	for (i = 0; i < n; i++) {
@@ -42,6 +42,9 @@ void storeMatrix(double *squared_matrix, int n, FILE* file) {
 	}
 }
 
+/* Becaute LU decomposition is used  det M = det LU = det L * det U, L and U are triangular
+   so the determinant is calculated as the product of the diagonal elements
+ */
 double determinant(double *l, double *u, int n) {
 	int i;
 	double det = 1;
@@ -53,6 +56,7 @@ double determinant(double *l, double *u, int n) {
 	return det;
 }
 
+/* Since L is a lower triangular matrix forward substitution is used to perform the calculus of Lx=y */
 void forwardSubstitution(double *l, double *p, double *y, int column, int n) {
 	int i, j;
 	double sum = 0;
@@ -66,6 +70,7 @@ void forwardSubstitution(double *l, double *p, double *y, int column, int n) {
     }
 }
 
+/* Since U is an upper triangular matrix backward substitution is used to perform the calculus of Ux=y */
 void backwardSubstitution(double *u, double *y, double *a_inv, int column, int n) {
     int i, j;
 	double sum;
@@ -81,17 +86,17 @@ void backwardSubstitution(double *u, double *y, double *a_inv, int column, int n
     }
 }
 
+/* Even if det(M)!=0, pivoting is performed to be sure that L and U are correctly upper and lower triangular matrix */
 void pivoting(double *a, double *p, int n) { 
     int j, k;
 	int isMaximum = 0; 
-    double *temp = (double*)malloc(n * sizeof(double));	// to perform memory swappings
+    double *temp = (double*)malloc(n * sizeof(double));
     
     // k is column and j is row
 	for (k = 0; k < n-1; k++) {   
     	int imax = k;
         for (j = k; j < n; j++) { 	
-            // finding the maximum index
-			if (a[j * n + k] > a[imax * n + k]) { 
+			if (a[j * n + k] > a[imax * n + k]) {  // finding the maximum index
 				imax = j;
                 isMaximum = 1;
             }
@@ -113,6 +118,7 @@ void pivoting(double *a, double *p, int n) {
 	free(temp);
 }
 
+/* Perf LU decomposition of matrix M*/
 void lu(double *l, double *u, int n) {
     int i, j, k;
     
@@ -131,6 +137,8 @@ int main(int argc, char* argv[]) {
 		printf("Parameters error.\n");
 		exit(1);
 	}
+	
+	printf("This program compute the inverse of a squared matrix using only one thread\nPlease wait until computation are done...\n");
 
 	FILE *mat, *resultFile;
 	clock_t t;
@@ -148,8 +156,9 @@ int main(int argc, char* argv[]) {
 		exit(1);
 	}
 	
-	int n = m.nrows; //matrix order
+	int n = m.nrows; //matrix order (m is squared)
 	
+	//Create pivoting and inverse matrices
 	double *a_inv = (double*)malloc(n * n * sizeof(double));
 	double *p = (double*)malloc(n * n * sizeof(double));
 	double *l = (double*)malloc(n * n * sizeof(double));
@@ -157,8 +166,7 @@ int main(int argc, char* argv[]) {
 	double *u = (double*)malloc(n * n * sizeof(double));
 	double *y = (double*)malloc(n * sizeof(double));
     
-	/* Creating pivoting matrix and setting inverse matrix to 0 */
-	/* Creating matrix l and copying a into a_p */
+	//Matrices initialization
 	memset(a_inv, 0, n * n * sizeof(double));
 	memset(p, 0, n * n * sizeof(double));
 	memset(l, 0, n * n * sizeof(double));
@@ -172,10 +180,8 @@ int main(int argc, char* argv[]) {
 	t = clock();
 	pivoting(a_p, p, n);
 		
-	/* Creating matrix u using a_p */
-	memcpy(u, a_p, n * n * sizeof(double));
+	memcpy(u, a_p, n * n * sizeof(double));	//Fill u using a_p elements
 	
-	/* Performing LU decomposition */
     lu(l, u, n);
 	
 	double det = determinant(l, u, n);
@@ -201,7 +207,7 @@ int main(int argc, char* argv[]) {
 	t = clock() - t;
 	
 	resultFile = fopen("inverse.txt", "w");
-	storeMatrix(a_inv, n, resultFile);
+	printMatrix(a_inv, n, resultFile);
 
 	printf("\nElapsed time: %lf seconds\n", ((double)t) / CLOCKS_PER_SEC);
 

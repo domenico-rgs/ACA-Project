@@ -25,6 +25,8 @@ __global__ void fillInVectors(double *d_p, double *d_l, int n);
 __global__ void inverse(double *d_l,double *d_p, double *d_u, double *d_a_inv, int n);
 //void forwardSubstitution(double *l, double *p, double *y, int column, int n);
 //void backwardSubstitution(double *u, double *y, double *a_inv, int column, int n);
+__host__ void checkCudaError(int linea);
+
 
 
 /* Reads a matrix from a file and stores it into the appropriate structure. */
@@ -70,6 +72,14 @@ __device__ double atomicMul(double* address, double val){
     return __longlong_as_double(old);
 }
 #endif
+
+__host__ void checkCudaError(int linea) {
+	cudaError err = cudaGetLastError();
+	if (err != cudaSuccess) {
+		printf("cuda error: %s alla linea %d\n", cudaGetErrorString(err), linea);
+		exit(-1);
+	}
+}
 
 __global__ void fillInVectors(double *d_p, double *d_l, int n){
 	int i = blockIdx.x*blockDim.x+threadIdx.x;
@@ -182,7 +192,6 @@ __global__ void inverse(double *d_l,double *d_p, double *d_u, double *d_a_inv, i
 	
 	double *d_y = (double*)malloc(n*sizeof(double));
 	memset(d_y, 0, n*sizeof(double));
-	__syncthreads();
 
 	if(i<n){
 		forwardSubstitution(d_l, d_p, d_y, i, n);
@@ -269,13 +278,20 @@ int main(int argc, char* argv[]) {
 	double det;
 
 	cudaMalloc((void**)&d_l, n*n*sizeof(double));
+	checkCudaError(__LINE__);
 	cudaMalloc((void**)&d_p, n*n*sizeof(double));
+	checkCudaError(__LINE__);
 	cudaMalloc((void**)&d_u, n*n*sizeof(double));
+	checkCudaError(__LINE__);
 	cudaMalloc((void**)&d_a_inv, n*n*sizeof(double));
+	checkCudaError(__LINE__);
    	cudaMalloc((void**)&d_det, sizeof(double));
-	
+	checkCudaError(__LINE__);
+
 	cudaMemset(d_p, 0, n * n * sizeof(double));
+	checkCudaError(__LINE__);
 	cudaMemset(d_l, 0, n * n * sizeof(double));
+	checkCudaError(__LINE__);
 
 	int block_x = n / THREADS;
 	if ((n) % THREADS != 0) {
@@ -286,9 +302,12 @@ int main(int argc, char* argv[]) {
 	dim3 dimGridLinear(block_x, 1, 1);
 	
 	fillInVectors <<<dimGridLinear, dimBlockLinear>>>(d_p, d_l, n);
+	checkCudaError(__LINE__);
 	
 	cudaMemcpy(l, d_l, n*n*sizeof(double), cudaMemcpyDeviceToHost);
+	checkCudaError(__LINE__);
 	cudaMemcpy(p, d_p, n*n*sizeof(double), cudaMemcpyDeviceToHost);
+	checkCudaError(__LINE__);
 
 
 	t = clock();
@@ -299,11 +318,15 @@ int main(int argc, char* argv[]) {
     lu (l, u, n);
 	
 	cudaMemcpy(d_l, l, n * n * sizeof(double), cudaMemcpyHostToDevice);
+	checkCudaError(__LINE__);
 	cudaMemcpy(d_u, u, n * n * sizeof(double), cudaMemcpyHostToDevice);
+	checkCudaError(__LINE__);
 
 	determinant <<<dimGridLinear, dimBlockLinear>>>(d_l, d_u, n, d_det, perm);
+	checkCudaError(__LINE__);
 
 	cudaMemcpy(&det, d_det, sizeof(double), cudaMemcpyDeviceToHost);
+	checkCudaError(__LINE__);
 
 	cudaDeviceSynchronize();
 
@@ -326,9 +349,12 @@ int main(int argc, char* argv[]) {
 	}
 
 	cudaMemcpy(d_p, p, n * n * sizeof(double), cudaMemcpyHostToDevice);
+	checkCudaError(__LINE__);
 	cudaMemcpy(d_a_inv, a_inv, n * n * sizeof(double), cudaMemcpyHostToDevice);
+	checkCudaError(__LINE__);
 
 	inverse <<<dimGridLinear, dimBlockLinear>>>(d_l, d_p, d_u, d_a_inv, n);
+	checkCudaError(__LINE__);
 	cudaDeviceSynchronize();
 
 	/*for (i = 0; i < n; i++) {
@@ -339,6 +365,7 @@ int main(int argc, char* argv[]) {
 	t = clock() - t;
 	
 	cudaMemcpy(a_inv, d_a_inv, n*n*sizeof(double), cudaMemcpyDeviceToHost);
+	checkCudaError(__LINE__);
 
 	//cudaProfilerStop();
 

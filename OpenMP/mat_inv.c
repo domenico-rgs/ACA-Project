@@ -171,7 +171,6 @@ int main(int argc, char* argv[]) {
 	double *l = (double*)malloc(n * n * sizeof(double));
 	double *a_p = (double*)malloc(n * n * sizeof(double));
 	double *u = (double*)malloc(n * n * sizeof(double));
-	double *y = (double*)malloc(n * sizeof(double));
     
 	/* Matrices initialization */
 	memset(a_inv, 0, n * n * sizeof(double));
@@ -194,30 +193,29 @@ int main(int argc, char* argv[]) {
 	double det = determinant(l, u, n, &perm);
 	printf("Determinant: %.10lf\n", det);
 	if(det == 0.0){
-		printf("ERROR: It is not possible to compute the inversion: the matrix is not squared\n");
+		printf("ERROR: It is not possible to compute the inversion: determinant is equal to 0\n");
 		fclose(mat);
 		free(p);		
 		free(l);
 		free(u);
 		free(a_p);
-		free(y);
 		free(a_inv);	
 		free(m.mat);
 		exit(1);
 	}
 	
 	/* Finding the inverse, result is stored into a_inv */
-	#pragma omp parallel shared(a_inv, y, n) private(i)
+	omp_set_num_threads(8);
+	#pragma omp parallel shared(a_inv) private(i)
 	{
-		int tid = omp_get_thread_num();
-		#pragma omp for schedule(static, 200)
+		#pragma omp for schedule(dynamic)
 		for (i = 0; i < n; i++) {
+			double *y = (double*)malloc(n * sizeof(double));
 			forwardSubstitution(l, p, y, i, n); 			// y is filled
 			backwardSubstitution(u, y, a_inv, i, n);		// a_inv is filled
-			printf("Thread %d finished iteration n.%d\n", tid, i);
+			free(y);
 		}
 	}
-	
 	t = omp_get_wtime() - t;
 	
 	resultFile = fopen("inverse.txt", "w");
@@ -231,7 +229,6 @@ int main(int argc, char* argv[]) {
 	free(l);
 	free(u);
 	free(a_p);
-	free(y);
 	free(a_inv);		
 	free(m.mat);
 

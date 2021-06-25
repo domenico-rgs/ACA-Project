@@ -23,8 +23,6 @@ void lu(double *l, double *u, int n);
 __device__ double atomicMul(double* address, double val);
 __global__ void fillInVectors(double *d_p, double *d_l, int n);
 __global__ void inverse(double *d_l,double *d_p, double *d_u, double *d_a_inv, int n);
-//void forwardSubstitution(double *l, double *p, double *y, int column, int n);
-//void backwardSubstitution(double *u, double *y, double *a_inv, int column, int n);
 __host__ void checkCudaError(int linea);
 
 
@@ -97,13 +95,13 @@ __global__ void determinant(double *l, double *u, int n, double *d_det, int perm
 	int i = blockIdx.x*blockDim.x+threadIdx.x;
 	double det = 1;
 
-	if(i==1){
+	if(i==0){
 		d_det[0]=1;
 	}
 	__syncthreads();
 
 	if(i<n){
-			det *= l[i * n + i] * u[i * n + i];
+		det *= l[i * n + i] * u[i * n + i];
 	}
 
 	atomicMul(d_det, det);
@@ -115,48 +113,48 @@ __device__ void forwardSubstitution(double *d_l, double *d_p, double *d_y, int c
 	int i, j;
 	double sum = 0;
 
-    for (i = 0; i < n; i++) {
-        for (j = 0; j < i; j++) {
-            sum = sum + d_l[i * n + j] * d_y[j];
-        }
-        d_y[i] = (d_p[i * n + column] - sum) / d_l[i * n + i];
-        sum = 0;
-    }
+	for (i = 0; i < n; i++) {
+	        for (j = 0; j < i; j++) {
+	            sum = sum + d_l[i * n + j] * d_y[j];
+	        }
+	        d_y[i] = (d_p[i * n + column] - sum) / d_l[i * n + i];
+	        sum = 0;
+	}
 }
 
 __device__ void backwardSubstitution(double *d_u, double *d_y, double *d_a_inv, int column, int n) {
-    int i, j;
+	int i, j;
 	double sum;
 
-    d_a_inv[(n-1)*n+column] = d_y[n-1] / d_u[(n-1) * n + (n-1)];
+	d_a_inv[(n-1)*n+column] = d_y[n-1] / d_u[(n-1) * n + (n-1)];
 	
-    for (i = n - 2; i >= 0; i--) {
+	for (i = n - 2; i >= 0; i--) {
 		sum = d_y[i];
-        for (j = n - 1; j > i; j--) {
-           sum = sum - d_u[i * n + j] * d_a_inv[j*n+column];
-        }
-        d_a_inv[i*n+column] = sum / d_u[i * n + i];
-        sum = 0;
-    }
+	        for (j = n - 1; j > i; j--) {
+	           sum = sum - d_u[i * n + j] * d_a_inv[j*n+column];
+	        }
+	        d_a_inv[i*n+column] = sum / d_u[i * n + i];
+	        sum = 0;
+	}
 }
 
 /* Even if det(M)!=0, pivoting is performed to be sure that L and U are correctly upper and lower triangular matrix */
 void pivoting(double *a, double *p, int n, int *perm) {
-    int j, k;
+	int j, k;
 	int isMaximum = 0;
-    double *temp = (double*)malloc(n * sizeof(double));
+	double *temp = (double*)malloc(n * sizeof(double));
 
-    // k is column and j is row
+	// k is column and j is row
 	for (k = 0; k < n-1; k++) {
-    	int imax = k;
-        for (j = k; j < n; j++) {
+    		int imax = k;
+        	for (j = k; j < n; j++) {
 			if (a[j * n + k] > a[imax * n + k]) {  // finding the maximum index
 				imax = j;
-                isMaximum = 1;
-            }
-        }
-        if (isMaximum == 1) {
-        	// swapping a[k] and a[imax]
+        		        isMaximum = 1;
+        		}
+        	}
+        	if (isMaximum == 1) {
+        		// swapping a[k] and a[imax]
 			memcpy(temp, &a[k*n], n * sizeof(double));
 			memcpy(&a[k*n], &a[imax*n], n * sizeof(double));
 			memcpy(&a[imax*n], temp, n * sizeof(double));
@@ -167,8 +165,8 @@ void pivoting(double *a, double *p, int n, int *perm) {
 			memcpy(&p[imax*n], temp, n * sizeof(double));
 
 			perm[0]++;
-        	isMaximum = 0;
-    	}
+        		isMaximum = 0;
+    		}
 	}
 	free(temp);
 }
@@ -178,61 +176,28 @@ void lu(double *l, double *u, int n) {
     int i, j, k;
     
 	for (k = 0; k < n; k++) {
-        for (i = k + 1; i < n; i++) {
-            l[i * n + k] = u[i * n + k] / u[k * n + k];
-            for (j = k; j < n; j++) {
-                u[i * n + j] = u[i * n + j] - l[i * n + k] * u[k * n + j];
-            }
-        }
-    }
+        	for (i = k + 1; i < n; i++) {
+            			l[i * n + k] = u[i * n + k] / u[k * n + k];
+            		for (j = k; j < n; j++) {
+                		u[i * n + j] = u[i * n + j] - l[i * n + k] * u[k * n + j];
+            		}
+        	}
+    	}
 }
 
 __global__ void inverse(double *d_l,double *d_p, double *d_u, double *d_a_inv, int n){
 	int i = blockIdx.x*blockDim.x+threadIdx.x;	
 	
-	double *d_y = (double*)malloc(n*sizeof(double));
-	memset(d_y, 0, n*sizeof(double));
-
 	if(i<n){
+		double *d_y = (double*)malloc(n*sizeof(double));
+		memset(d_y, 0, n*sizeof(double));
+	
 		forwardSubstitution(d_l, d_p, d_y, i, n);
+		backwardSubstitution(d_u, d_y, d_a_inv, i, n);
+		
+		free(d_y);
 	}
-	__syncthreads();
-	
-	if(i<n){
-        backwardSubstitution(d_u, d_y, d_a_inv, i, n);
-	}
-	
-	free(d_y);
 }
-
-/* Since L is a lower triangular matrix forward substitution is used to perform the calculus of Lx=y */
-/*void forwardSubstitution(double *l, double *p, double *y, int column, int n) {
-	int i, j;
-	double sum = 0;
-	
-    for (i = 0; i < n; i++) {
-        for (j = 0; j < i; j++) {
-            sum = sum + l[i * n + j] * y[j];
-        }
-        y[i] = (p[i * n + column] - sum) / l[i * n + i];
-        sum = 0;
-    }
-}
-
-void backwardSubstitution(double *u, double *y, double *a_inv, int column, int n) {
-    int i, j;
-	double sum;
-    
-    a_inv[(n-1)*n+column] = y[n-1] / u[(n-1) * n + (n-1)];
-    for (i = n - 2; i >= 0; i--) {
-		sum = y[i];
-        for (j = n - 1; j > i; j--) {
-           sum = sum - u[i * n + j] * a_inv[j*n+column];
-        }
-        a_inv[i*n+column] = sum / u[i * n + i]; 
-        sum = 0;
-    }
-}*/
 
 int main(int argc, char* argv[]) {
 	if(argc != 2) { //Checking parameters: 1.mat_inv.exe 2.matrix
@@ -277,21 +242,14 @@ int main(int argc, char* argv[]) {
 	double *d_l, *d_u, *d_p, *d_det, *d_a_inv;
 	double det;
 
-	cudaMalloc((void**)&d_l, n*n*sizeof(double));
-	checkCudaError(__LINE__);
-	cudaMalloc((void**)&d_p, n*n*sizeof(double));
-	checkCudaError(__LINE__);
-	cudaMalloc((void**)&d_u, n*n*sizeof(double));
-	checkCudaError(__LINE__);
 	cudaMalloc((void**)&d_a_inv, n*n*sizeof(double));
-	checkCudaError(__LINE__);
+	cudaMalloc((void**)&d_p, n*n*sizeof(double));
+	cudaMalloc((void**)&d_l, n*n*sizeof(double));
+	cudaMalloc((void**)&d_u, n*n*sizeof(double));
    	cudaMalloc((void**)&d_det, sizeof(double));
-	checkCudaError(__LINE__);
 
 	cudaMemset(d_p, 0, n * n * sizeof(double));
-	checkCudaError(__LINE__);
 	cudaMemset(d_l, 0, n * n * sizeof(double));
-	checkCudaError(__LINE__);
 
 	int block_x = n / THREADS;
 	if ((n) % THREADS != 0) {
@@ -302,31 +260,24 @@ int main(int argc, char* argv[]) {
 	dim3 dimGridLinear(block_x, 1, 1);
 	
 	fillInVectors <<<dimGridLinear, dimBlockLinear>>>(d_p, d_l, n);
-	checkCudaError(__LINE__);
 	
 	cudaMemcpy(l, d_l, n*n*sizeof(double), cudaMemcpyDeviceToHost);
-	checkCudaError(__LINE__);
 	cudaMemcpy(p, d_p, n*n*sizeof(double), cudaMemcpyDeviceToHost);
-	checkCudaError(__LINE__);
-
-
+	cudaDeviceSynchronize();
+	
 	t = clock();
 	pivoting(a_p, p, n, &perm);
 
 	memcpy(u, a_p, n * n * sizeof(double));	//Fill u using a_p elements
 
-    lu (l, u, n);
+    	lu (l, u, n);
 	
 	cudaMemcpy(d_l, l, n * n * sizeof(double), cudaMemcpyHostToDevice);
-	checkCudaError(__LINE__);
 	cudaMemcpy(d_u, u, n * n * sizeof(double), cudaMemcpyHostToDevice);
-	checkCudaError(__LINE__);
 
 	determinant <<<dimGridLinear, dimBlockLinear>>>(d_l, d_u, n, d_det, perm);
-	checkCudaError(__LINE__);
 
 	cudaMemcpy(&det, d_det, sizeof(double), cudaMemcpyDeviceToHost);
-	checkCudaError(__LINE__);
 
 	cudaDeviceSynchronize();
 
@@ -349,23 +300,14 @@ int main(int argc, char* argv[]) {
 	}
 
 	cudaMemcpy(d_p, p, n * n * sizeof(double), cudaMemcpyHostToDevice);
-	checkCudaError(__LINE__);
 	cudaMemcpy(d_a_inv, a_inv, n * n * sizeof(double), cudaMemcpyHostToDevice);
-	checkCudaError(__LINE__);
 
 	inverse <<<dimGridLinear, dimBlockLinear>>>(d_l, d_p, d_u, d_a_inv, n);
-	checkCudaError(__LINE__);
 	cudaDeviceSynchronize();
-
-	/*for (i = 0; i < n; i++) {
-        forwardSubstitution(l, p, y, i, n); 			// y is filled
-        backwardSubstitution(u, y, a_inv, i, n);		// a_inv is filled
-    }*/
 
 	t = clock() - t;
 	
 	cudaMemcpy(a_inv, d_a_inv, n*n*sizeof(double), cudaMemcpyDeviceToHost);
-	checkCudaError(__LINE__);
 
 	//cudaProfilerStop();
 

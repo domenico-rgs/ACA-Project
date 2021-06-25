@@ -51,7 +51,7 @@ double determinant(double *l, double *u, int n, int *perm) {
 	double det = 1;
 
 	for(i=0; i<n; i++){
-			det *= l[i * n + i] * u[i * n + i];
+		det *= l[i * n + i] * u[i * n + i];
 	}
 	
 	return pow(-1,perm[0]) * det;
@@ -62,48 +62,48 @@ void forwardSubstitution(double *l, double *p, double *y, int column, int n) {
 	int i, j;
 	double sum = 0;
 	
-    for (i = 0; i < n; i++) {
-        for (j = 0; j < i; j++) {
-            sum = sum + l[i * n + j] * y[j];
-        }
-        y[i] = (p[i * n + column] - sum) / l[i * n + i];
-        sum = 0;
-    }
+	for (i = 0; i < n; i++) {
+		for (j = 0; j < i; j++) {
+			sum = sum + l[i * n + j] * y[j];
+        	}
+        	y[i] = (p[i * n + column] - sum) / l[i * n + i];
+        	sum = 0;
+	}
 }
 
 /* Since U is an upper triangular matrix backward substitution is used to perform the calculus of Ux=y */
 void backwardSubstitution(double *u, double *y, double *a_inv, int column, int n) {
-    int i, j;
+	int i, j;
 	double sum;
     
-    a_inv[(n-1)*n+column] = y[n-1] / u[(n-1) * n + (n-1)];
-    for (i = n - 2; i >= 0; i--) {
+	a_inv[(n-1)*n+column] = y[n-1] / u[(n-1) * n + (n-1)];
+	for (i = n - 2; i >= 0; i--) {
 		sum = y[i];
-        for (j = n - 1; j > i; j--) {
-           sum = sum - u[i * n + j] * a_inv[j*n+column];
-        }
-        a_inv[i*n+column] = sum / u[i * n + i]; 
-        sum = 0;
-    }
+		for (j = n - 1; j > i; j--) {
+			sum = sum - u[i * n + j] * a_inv[j*n+column];
+        	}
+        	a_inv[i*n+column] = sum / u[i * n + i]; 
+       		sum = 0;
+    	}
 }
 
 /* Even if det(M)!=0, pivoting is performed to be sure that L and U are correctly upper and lower triangular matrix */
 void pivoting(double *a, double *p, int n, int *perm) { 
-    int j, k;
+	int j, k;
 	int isMaximum = 0; 
-    double *temp = (double*)malloc(n * sizeof(double));
+	double *temp = (double*)malloc(n * sizeof(double));
     
-    // k is column and j is row
+	// k is column and j is row
 	for (k = 0; k < n-1; k++) {   
-    	int imax = k;
-        for (j = k; j < n; j++) { 	
+    		int imax = k;
+        	for (j = k; j < n; j++) { 	
 			if (a[j * n + k] > a[imax * n + k]) {  // finding the maximum index
 				imax = j;
-                isMaximum = 1;
-            }
-        }
-        if (isMaximum == 1) {
-        	// swapping a[k] and a[imax]
+                		isMaximum = 1;
+            		}
+        	}
+        	if (isMaximum == 1) {
+        		// swapping a[k] and a[imax]
 			memcpy(temp, &a[k*n], n * sizeof(double));
 			memcpy(&a[k*n], &a[imax*n], n * sizeof(double));
 			memcpy(&a[imax*n], temp, n * sizeof(double));
@@ -113,9 +113,9 @@ void pivoting(double *a, double *p, int n, int *perm) {
 			memcpy(&p[k*n], &p[imax*n], n * sizeof(double));
 			memcpy(&p[imax*n], temp, n * sizeof(double));
 			
-        	isMaximum = 0;
+        		isMaximum = 0;
 			perm[0]++;
-    	}
+    		}
 	}
 	free(temp);
 }
@@ -125,13 +125,13 @@ void lu(double *l, double *u, int n) {
     int i, j, k;
     
 	for (k = 0; k < n; k++) {
-        for (i = k + 1; i < n; i++) {
-            l[i * n + k] = u[i * n + k] / u[k * n + k];
-            for (j = k; j < n; j++) {
-                u[i * n + j] = u[i * n + j] - l[i * n + k] * u[k * n + j];
-            }
-        }
-    }
+		for (i = k + 1; i < n; i++) {
+            		l[i * n + k] = u[i * n + k] / u[k * n + k];
+            		for (j = k; j < n; j++) {
+                		u[i * n + j] = u[i * n + j] - l[i * n + k] * u[k * n + j];
+            		}	
+        	}
+    	}
 }
 
 int main(int argc, char* argv[]) {
@@ -140,7 +140,7 @@ int main(int argc, char* argv[]) {
 		exit(1);
 	}
 	
-	printf("This program compute the inverse of a squared matrix using only one thread\n");
+	//printf("This program compute the inverse of a squared matrix using only one thread\n");
 
 	FILE *mat, *resultFile;
 	clock_t t;
@@ -160,7 +160,7 @@ int main(int argc, char* argv[]) {
 	
 	int n = m.nrows; //matrix order (m is squared)
 	
-	printf("\nThe matrix you have inserted is %dx%d and has %d elements\nPlease wait until computation are done...\n\n", n,n,n*n);
+	//printf("\nThe matrix you have inserted is %dx%d and has %d elements\nPlease wait until computation are done...\n\n", n,n,n*n);
 	
 	//Create pivoting and inverse matrices
 	double *a_inv = (double*)malloc(n * n * sizeof(double));
@@ -177,19 +177,19 @@ int main(int argc, char* argv[]) {
 	memcpy(a_p, m.mat, n * n * sizeof(double));
 	
 	for (i = 0; i < n; i++) {
-        p[i * n + i] = 1;
+        	p[i * n + i] = 1;
 		l[i * n + i] = 1;
-    }
+    	}
    
 	t = clock();
 	pivoting(a_p, p, n, &perm);
 		
 	memcpy(u, a_p, n * n * sizeof(double));	//Fill u using a_p elements
 	
-    lu(l, u, n);
+    	lu(l, u, n);
 	
 	double det = determinant(l, u, n, &perm);
-	printf("Determinant: %lf\n", det);
+	//printf("Determinant: %lf\n", det);
 	if(det == 0.0){
 		printf("ERROR: It is not possible to compute the inversion: the matrix is not squared\n");
 		fclose(mat);
@@ -205,15 +205,15 @@ int main(int argc, char* argv[]) {
 	
 	/* Finding the inverse, result is stored into a_inv */
 	for (i = 0; i < n; i++) {
-        forwardSubstitution(l, p, y, i, n); 			// y is filled
-        backwardSubstitution(u, y, a_inv, i, n);		// a_inv is filled
-    }
+        	forwardSubstitution(l, p, y, i, n); 			// y is filled
+        	backwardSubstitution(u, y, a_inv, i, n);		// a_inv is filled
+    	}
 	t = clock() - t;
 	
 	resultFile = fopen("inverse.txt", "w");
 	printMatrix(a_inv, n, resultFile);
 
-	printf("\nElapsed time: %lf seconds\n", ((double)t) / CLOCKS_PER_SEC);
+	printf("Elapsed time: %lf seconds\n", ((double)t) / CLOCKS_PER_SEC);
 
 	fclose(mat);
 	fclose(resultFile);

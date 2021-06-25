@@ -100,7 +100,7 @@ int main(int argc, char* argv[]) {
 	resultFile = fopen("result.txt", "w");
 	printMatrix(&m3, resultFile);
 
-	printf("Elapsed time: %f seconds", ((double)t)/CLOCKS_PER_SEC);
+	printf("Elapsed time: %f seconds\n", ((double)t)/CLOCKS_PER_SEC);
 
 	fclose(mat1);
 	fclose(mat2);

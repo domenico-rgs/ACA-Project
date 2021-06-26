@@ -55,12 +55,6 @@ void matrixMul(int BS, double** m1, double** m2, double** m3, int m, int p) {
 	int i, j, k;
 	int ii, jj, kk;	
 	
-	#pragma omp parallel for
-	for(i=0; i<m; i++){
-		m3[i]=(double*)malloc(p*sizeof(double));
-		memset(m3[i], 0,  p * sizeof(double)); 
-	}
-	
 	for(i=0; i<m; i+=BS){
 		for(j=0; j<p; j+=BS){
 			for(k=0; k<p; k+=BS){
@@ -79,13 +73,13 @@ void matrixMul(int BS, double** m1, double** m2, double** m3, int m, int p) {
 
 int main(int argc, char* argv[]) {
 	if(argc != 3){ //1- exe name, 2- mat1, 3- mat2
-		printf("Parameter error.");
+		printf("Parameter error.\n");
 		exit(1);
 	}
 
 	FILE *mat1, *mat2, *resultFile;
 	double t;
-	int m, n1, n2, p;
+	int m, n1, n2, p, i;
 
 	mat1 = fopen(argv[1], "r");
 	mat2 = fopen(argv[2], "r");
@@ -94,7 +88,7 @@ int main(int argc, char* argv[]) {
 
 	/* Multiplication is permitted if m1 is m x n and m2 is n x p */
 	if(n1 != n2) {
-		printf("It is not possible to do matrix multiplication. Check matrix number of rows and cols.");
+		printf("It is not possible to do matrix multiplication. Check matrix number of rows and cols.\n");
 		fclose(mat1);
 		fclose(mat2);
 		exit(1);
@@ -108,6 +102,11 @@ int main(int argc, char* argv[]) {
 	readMatrix(m2, mat2, n2, p);
 	
 	t = omp_get_wtime();
+	#pragma omp parallel for private(i)
+	for(i=0; i<m; i++){
+		m3[i]=(double*)malloc(p*sizeof(double));
+		memset(m3[i], 0,  p * sizeof(double)); 
+	}
 		
 	#pragma omp parallel
 	#pragma omp single
@@ -122,7 +121,6 @@ int main(int argc, char* argv[]) {
 	fclose(mat1);
 	fclose(mat2);
 	fclose(resultFile);
-	int i;
 	for(i=0; i<m; i++){
 		free(m1[i]);
 		free(m3[i]);

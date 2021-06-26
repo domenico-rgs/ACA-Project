@@ -69,7 +69,7 @@ __global__ void matrixMul(double *d_m1, double *d_m2, double *d_m3, int row1, in
 
 int main(int argc, char* argv[]) {
 	if(argc != 3){ //1- exe name, 2- mat1, 3- mat2
-		printf("Parameter error.");
+		printf("Parameter error.\n");
 		exit(1);
 	}
 
@@ -84,7 +84,7 @@ int main(int argc, char* argv[]) {
 
 	//Multiplication is permitted if m1 is m x n and m2 is n x p.
 	if(m1.ncols != m2.nrows){
-		printf("It is not possible to do matrix multiplication. Check matrices number of rows and cols.");
+		printf("It is not possible to do matrix multiplication. Check matrices number of rows and cols.\n");
 		fclose(mat1);
 		fclose(mat2);
 		exit(1);
@@ -121,21 +121,19 @@ int main(int argc, char* argv[]) {
 
 	cudaMemcpy(m3.mat, d_m3, m3.nrows*m3.ncols * sizeof(double), cudaMemcpyDeviceToHost);
 
-	cudaFree(d_m1);
-	cudaFree(d_m2);
-	cudaFree(d_m3);
-
 	//cudaProfilerStop();
 
 	resultFile = fopen("result.txt", "w");
 	printMatrix(&m3, resultFile);
 
-	printf("Elapsed time: %.5lf seconds", ((double)t)/CLOCKS_PER_SEC);
+	printf("Elapsed time: %.5lf seconds\n", ((double)t)/CLOCKS_PER_SEC);
 
 	fclose(mat1);
 	fclose(mat2);
 	fclose(resultFile);
-
+	cudaFree(d_m1);
+	cudaFree(d_m2);
+	cudaFree(d_m3);
 	free(m1.mat);
 	free(m2.mat);
 	free(m3.mat);

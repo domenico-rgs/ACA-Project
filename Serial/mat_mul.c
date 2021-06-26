@@ -57,6 +57,7 @@ void matrixMul(struct matrix* m1, struct matrix* m2, struct matrix* m3) {
 	m3->mat = (double*)malloc(m3->nrows * m3->ncols * sizeof(double));
 	memset(m3->mat, 0, m3->nrows * m3->ncols * sizeof(double)); //set the memory allocated to the m3 matrix to zero
 
+	clock_t t = clock();
 	//classical multiplication done with a summation
 	for (i = 0; i < m1->nrows; i++) {
 		for (j = 0; j < m2->ncols; j++) {
@@ -65,11 +66,13 @@ void matrixMul(struct matrix* m1, struct matrix* m2, struct matrix* m3) {
 			}
 		}
 	}
+	t = clock() - t;
+	printf("time: %f seconds\n", ((double)t)/CLOCKS_PER_SEC);
 }
 
 int main(int argc, char* argv[]) {
 	if(argc != 3){ //1- exe name, 2- mat1, 3- mat2
-		printf("Parameter error.");
+		printf("Parameter error.\n");
 		exit(1);
 	}
 
@@ -84,7 +87,7 @@ int main(int argc, char* argv[]) {
 
 	//Multiplication is permitted if m1 is m x n and m2 is n x p.
 	if(m1.ncols != m2.nrows){
-		printf("It is not possible to do matrix multiplication. Check matrix number of rows and cols.");
+		printf("It is not possible to do matrix multiplication. Check matrix number of rows and cols.\n");
 		fclose(mat1);
 		fclose(mat2);
 		exit(1);

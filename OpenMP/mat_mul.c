@@ -3,28 +3,24 @@
 #include <string.h>
 #include <omp.h>
 
-struct matrix {
-	int ncols;
-	int nrows;
-	double* mat;
-};
-
-void readMatrix(struct matrix* m, FILE* file);
-void printMatrice(struct matrix* m, FILE* file);
-void matrixMul(struct matrix* m1, struct matrix* m2, struct matrix* m3);
+void readMatrix(double** m, FILE* file, int rows, int cols);
+void printMatrix(double** m, FILE* file, int rows, int cols);
+void matrixMul(double** m1, double** m2, double** m3, int m, int p);
 
 /*
  * Knowing the number of rows and columns,
  * it reads a matrix from a file and stores it in the appropriate structure.
 */
-void readMatrix(struct matrix* m, FILE* file) {
+void readMatrix(double** m, FILE* file, int rows, int cols) {
 	int i, j;
 
-	m->mat = (double*)malloc(m->ncols * m->nrows * sizeof(double));
+	for(i = 0; i < rows; i++) {
+		m[i] = (double*)malloc(cols*sizeof(double));
+	}
 
-	for (i = 0; i < m->nrows; i++) {
-		for (j = 0; j < m->ncols; j++) {
-			fscanf(file, "%lf", &m->mat[i * m->ncols + j]);
+	for (i = 0; i < rows; i++) {
+		for (j = 0; j < cols; j++) {
+			fscanf(file, "%lf", &m[i][j]);
 		}
 	}
 }
@@ -32,12 +28,12 @@ void readMatrix(struct matrix* m, FILE* file) {
 /*
  * The opposite operation of readMatrix. Stores a matrix into the file passed as argument
 */
-void printMatrix(struct matrix* m, FILE* file) {
+void printMatrix(double** m, FILE* file, int rows, int cols) {
 	int i, j;
 
-	for (i = 0; i < m->nrows; i++) {
-		for (j = 0; j < m->ncols; j++) {
-			fprintf(file, "%lf ", m->mat[i * m->ncols + j]);
+	for (i = 0; i < rows; i++) {
+		for (j = 0; j < cols; j++) {
+			fprintf(file, "%lf ", m[i][j]);
 		}
 		fprintf(file, "\n");
 	}
@@ -47,25 +43,21 @@ void printMatrix(struct matrix* m, FILE* file) {
  * Performs the multiplication operation between the matrices m1 and m2.
  * The result will be stored in the matrix m3.
 */
-void matrixMul(struct matrix* m1, struct matrix* m2, struct matrix* m3) {
+void matrixMul(double** m1, double** m2, double** m3, int m, int p) {
 	int i, j, k;
-
-	m3->nrows = m1->nrows;
-	m3->ncols = m2->ncols;
-
-	/* dynamically allocates the m3-matrix to be used to save the result */
-	m3->mat = (double*)malloc(m3->nrows * m3->ncols * sizeof(double));
-	/* sets the memory allocated to the m3 matrix to zero */
-	memset(m3->mat, 0, m3->nrows * m3->ncols * sizeof(double)); 
-
-	/* classical multiplication done with a summation */
+	
+	for(i = 0; i < m; i++) {
+		m3[i] = (double*)malloc(p * sizeof(double));
+		memset(m3[i], 0,  p * sizeof(double)); 
+	}
+	
 	#pragma omp parallel shared(m1, m2, m3) private(i, j, k)
 	{
 		#pragma omp for schedule (dynamic)
-		for (i = 0; i < m1->nrows; i++) {
-			for (j = 0; j < m2->ncols; j++) {
-				for (k = 0; k < m1->ncols; k++) { 
-					m3->mat[i * m3->ncols + j] += m1->mat[i*m1->ncols+k] * m2->mat[k*m2->ncols+j];
+		for (i = 0; i < m; i++) {
+			for (j = 0; j < p; j++) {
+				for (k = 0; k < p; k++) { 
+					m3[i][j] += m1[i][k] * m2[k][j];
 				}	
 			}
 		}
@@ -74,44 +66,56 @@ void matrixMul(struct matrix* m1, struct matrix* m2, struct matrix* m3) {
 
 int main(int argc, char* argv[]) {
 	if(argc != 3){ //1- exe name, 2- mat1, 3- mat2
-		printf("Parameter error.");
+		printf("Parameter error.\n");
 		exit(1);
 	}
 
 	FILE *mat1, *mat2, *resultFile;
 	double t;
-	struct matrix m1, m2, m3;
+	int m, n1, n2, p, i;
 
 	mat1 = fopen(argv[1], "r");
 	mat2 = fopen(argv[2], "r");
-	fscanf(mat1, "%d %d", &m1.nrows, &m1.ncols);
-	fscanf(mat2, "%d %d", &m2.nrows, &m2.ncols);
+	fscanf(mat1, "%d %d", &m, &n1);
+	fscanf(mat2, "%d %d", &n2, &p);
 
 	/* Multiplication is permitted if m1 is m x n and m2 is n x p */
-	if(m1.ncols != m2.nrows) {
-		printf("It is not possible to do matrix multiplication. Check matrix number of rows and cols.");
+	if(n1 != n2) {
+		printf("It is not possible to do matrix multiplication. Check matrix number of rows and cols.\n");
 		fclose(mat1);
 		fclose(mat2);
 		exit(1);
 	}
-
-	readMatrix(&m1, mat1);
-	readMatrix(&m2, mat2);
-
+	
+	double **m1 = (double **)malloc(m*sizeof(double*));
+	double **m2 = (double **)malloc(n2*sizeof(double*));
+	double **m3 = (double **)malloc(m*sizeof(double*));
+	
+	readMatrix(m1, mat1, m, n1);
+	readMatrix(m2, mat2, n2, p);
+	
 	t = omp_get_wtime();
-	matrixMul(&m1, &m2, &m3);
+	matrixMul(m1, m2, m3, m, p);
 	t = omp_get_wtime() - t; // total time spent in matrixMul
 
 	resultFile = fopen("result.txt", "w");
-	printMatrix(&m3, resultFile);
+	printMatrix(m3, resultFile, m, p);
 
 	printf("Elapsed time: %.5f seconds\n", t);
 
 	fclose(mat1);
 	fclose(mat2);
 	fclose(resultFile);
-	free(m1.mat);
-	free(m2.mat);
-	free(m3.mat);
+
+	for(i = 0; i < m; i++) {
+		free(m1[i]);
+		free(m3[i]);
+	}
+	for(i = 0; i < n2; i++) {
+		free(m2[i]);
+	}
+	free(m1);
+	free(m2);
+	free(m3);
 	return 0;
 }

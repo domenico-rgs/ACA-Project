@@ -14,9 +14,9 @@ cp ../Utils/mat1.txt ../OpenMP/mat1_2048.txt
 python3 ../Utils/mat_gen.py 3072x3072
 cp ../Utils/mat1.txt ../Serial/mat1_3072.txt 
 cp ../Utils/mat1.txt ../OpenMP/mat1_3072.txt 
-gcc -O3 -w ../Serial/mat_inv.c -o matinv -lm
+gcc -O2 -w ../Serial/mat_inv.c -o matinv -lm
 cp ../Utils/matinv ../Serial/
-gcc -O3 -w -fopenmp ../OpenMP/mat_inv.c -o matinv -lm
+gcc -O2 -w -fopenmp ../OpenMP/mat_inv.c -o matinv -lm
 cp ../Utils/matinv ../OpenMP/
 chmod +x ../Serial/matinv
 chmod +x ../OpenMP/matinv
@@ -154,4 +154,3 @@ echo -e "\nN 3072\n\n" >> ../Utils/resultInversion.txt
 ./matinv mat1_3072.txt >> ../Utils/resultInversion.txt
 ./matinv mat1_3072.txt >> ../Utils/resultInversion.txt
 echo "END" >> ./result.txt
-mail -s 'Computation complete' domenico.ragusa01@universitadipavia.it <<< 'Your computation batch is now finished. Check the results'

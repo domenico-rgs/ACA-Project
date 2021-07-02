@@ -28,8 +28,8 @@ gcc -O2 -w ../Serial/mat_mul.c -o matmul
 cp ../Utils/matmul ../Serial/
 gcc -O2 -w -fopenmp ../OpenMP/mat_mul.c -o matmul -lm
 cp ../Utils/matmul ../OpenMP/
-gcc -O2 -w -fopenmp ../OpenMP/mat_mul_blocksOMP45.c -o matmulOMP45 -lm
-cp ../Utils/matmul ../OpenMP/
+gcc -O2 -w -fopenmp ../OpenMP/mat_mul_blocks.c -o matmulOMP45 -lm
+cp ../Utils/matmulOMP45 ../OpenMP/
 chmod +x ../Serial/matmul
 chmod +x ../OpenMP/matmul
 chmod +x ../OpenMP/matmulOMP45
@@ -279,4 +279,3 @@ echo -e "\nN 3072\n\n" >> ../Utils/resultMultiplication.txt
 ./matmulOMP45 mat1_3072.txt mat2_3072.txt >> ../Utils/resultMultiplication.txt
 ./matmulOMP45 mat1_3072.txt mat2_3072.txt >> ../Utils/resultMultiplication.txt
 echo "END" >> ./resultMultiplication.txt
-mail -s 'Computation complete' domenico.ragusa01@universitadipavia.it <<< 'Your computation batch is now finished. Check the results'

@@ -10,7 +10,7 @@ double determinant(double **l, double **u, int n, int *perm);
 void forwardSubstitution(double **l, double **p, double *y, int column, int n);
 void backwardSubstitution(double **u, double *y, double **a_inv, int column, int n);
 void pivoting(double **a, double **p, int n, int *perm);
-void lu(double **l, double **u, int n);
+void decomposition(double **l, double **u, int n);
 
 /* Reads a matrix from a file and stores it into the appropriate structure. */
 void readMatrix(double** matrix, FILE* file, int n) {
@@ -117,7 +117,7 @@ void pivoting(double **a, double **p, int n, int *perm) {
 }
 
 /* Perf LU decomposition of matrix M*/
-void lu(double **l, double **u, int n) {
+void decomposition(double **l, double **u, int n) {
     int i, j, k;
     
 	for (k = 0; k < n; k++) {
@@ -171,19 +171,16 @@ int main(int argc, char* argv[]) {
 		l[i] = (double *)malloc(n * sizeof(double));
 		a_p[i] = (double *)malloc(n * sizeof(double));
 		u[i] = (double *)malloc(n * sizeof(double));
-	}
-	for(i = 0; i < n; i++) { 
+
 		memset(a_inv[i], 0, n * sizeof(double));
 		memset(p[i], 0, n * sizeof(double));
 		memset(l[i], 0, n * sizeof(double));
 		memset(u[i], 0, n * sizeof(double));
 		memcpy(a_p[i], m[i], n * sizeof(double));
-	}
-    	
-    for (i = 0; i < n; i++) {
-        p[i][i] = 1;
+		
+        	p[i][i] = 1;
 		l[i][i] = 1;
-    }
+   	 }
     
    	/* Starting LU algorithm */
 	t = clock();
@@ -193,7 +190,7 @@ int main(int argc, char* argv[]) {
 	for (i = 0; i < n; i++)
 		memcpy(u[i], a_p[i], n * sizeof(double));	// Fill u using a_p elements
 	
-    lu(l, u, n);
+    		decomposition(l, u, n);
 	
 	double det = determinant(l, u, n, &perm);
 	printf("Determinant: %lf\n", det);
@@ -221,9 +218,9 @@ int main(int argc, char* argv[]) {
 	
 	/* Finding the inverse, result is stored into a_inv */
 	for (i = 0; i < n; i++) {
-        forwardSubstitution(l, p, y, i, n); 			// y is filled
-        backwardSubstitution(u, y, a_inv, i, n);		// a_inv is filled
-    }
+        	forwardSubstitution(l, p, y, i, n); 			// y is filled
+        	backwardSubstitution(u, y, a_inv, i, n);		// a_inv is filled
+   	 }
 	t = clock() - t;
 	
 	resultFile = fopen("inverse.txt", "w");

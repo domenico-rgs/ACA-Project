@@ -1,3 +1,9 @@
+/* 
+* Same as in mat_inv.c but in this version we have tested the locality principle through the linearisation of the matrices.
+* Unfortunately this code appeared to be slow compared with the other probably for the compilator optimization.
+* Starting pseudocodes/algorithm: https://www-dimat.unipv.it/sangalli/numerical_methods_eng_sciences/1%20-%20Linear%20Systems%20(part%20I).pdf 
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,9 +22,12 @@ double determinant(double *l, double *u, int n, int *perm);
 void forwardSubstitution(double *l, double *p, double *y, int column, int n);
 void backwardSubstitution(double *u, double *y, double *a_inv, int column, int n);
 void pivoting(double *a, double *p, int n, int *perm);
-void lu(double *l, double *u, int n);
+void decomposition(double *l, double *u, int n);
 
-/* Reads a matrix from a file and stores it into the appropriate structure. */
+/*
+ * The file which contains a matrix has in its first row the dimensions
+ * then using fscanf each element of the matrix is stored on the memory allocated dynamically
+*/
 void readMatrix(struct matrix* m, FILE* file) {
 	int i, j;
 
@@ -31,7 +40,7 @@ void readMatrix(struct matrix* m, FILE* file) {
 	}
 }
 
-/* Stores a matrix into the file passed as argument */
+/* The opposite operation of readMatrix. Stores a matrix into a file, element by element */
 void printMatrix(double *squared_matrix, int n, FILE* file) {
 	int i, j;
 
@@ -43,9 +52,10 @@ void printMatrix(double *squared_matrix, int n, FILE* file) {
 	}
 }
 
-/* Becaute LU decomposition is used  det M = det LU = det L * det U, L and U are triangular
-   so the determinant is calculated as the product of the diagonal elements
- */
+/* 
+* Because LU decomposition is used, det M = det LU = det L * det U.
+* L and U are triangular so the determinant is calculated as the product of the diagonal elements
+*/
 double determinant(double *l, double *u, int n, int *perm) {
 	int i;
 	double det = 1;
@@ -54,7 +64,7 @@ double determinant(double *l, double *u, int n, int *perm) {
 		det *= l[i * n + i] * u[i * n + i];
 	}
 	
-	return pow(-1,perm[0]) * det;
+	return pow(-1,perm[0]) * det; //it is necessary to multiply the obtained the with (-1) raised to the number of permutation occurred in pivoting
 }
 
 /* Since L is a lower triangular matrix forward substitution is used to perform the calculus of Lx=y */
@@ -120,8 +130,8 @@ void pivoting(double *a, double *p, int n, int *perm) {
 	free(temp);
 }
 
-/* Perf LU decomposition of matrix M*/
-void lu(double *l, double *u, int n) {
+/* Perf LU decomposition of matrix M to obtain matrices L (lower) and U (upper) used to resolve and equation system throud BW and FW to obtain the inverse */
+void decomposition(double *l, double *u, int n) {
     int i, j, k;
     
 	for (k = 0; k < n; k++) {
@@ -135,12 +145,10 @@ void lu(double *l, double *u, int n) {
 }
 
 int main(int argc, char* argv[]) {
-	if(argc != 2) { //Checking parameters: 1.mat_inv.exe 2.matrix 
+	if(argc != 2) { //Checking parameters: 1.mat_inv.exe 2.matrix.txt
 		printf("Parameters error.\n");
 		exit(1);
 	}
-	
-	//printf("This program compute the inverse of a squared matrix using only one thread\n");
 
 	FILE *mat, *resultFile;
 	clock_t t;
@@ -162,7 +170,7 @@ int main(int argc, char* argv[]) {
 	
 	//printf("\nThe matrix you have inserted is %dx%d and has %d elements\nPlease wait until computation are done...\n\n", n,n,n*n);
 	
-	//Create pivoting and inverse matrices
+	//Create pivoting and inverse matrices and matrices initialization
 	double *a_inv = (double*)malloc(n * n * sizeof(double));
 	double *p = (double*)malloc(n * n * sizeof(double));
 	double *l = (double*)malloc(n * n * sizeof(double));
@@ -170,7 +178,6 @@ int main(int argc, char* argv[]) {
 	double *u = (double*)malloc(n * n * sizeof(double));
 	double *y = (double*)malloc(n * sizeof(double));
     
-	//Matrices initialization
 	memset(a_inv, 0, n * n * sizeof(double));
 	memset(p, 0, n * n * sizeof(double));
 	memset(l, 0, n * n * sizeof(double));
@@ -181,15 +188,17 @@ int main(int argc, char* argv[]) {
 		l[i * n + i] = 1;
     	}
    
+   	/* START */
 	t = clock();
+	
 	pivoting(a_p, p, n, &perm);
-		
 	memcpy(u, a_p, n * n * sizeof(double));	//Fill u using a_p elements
 	
-    	lu(l, u, n);
+    	decomposition(l, u, n);
 	
 	double det = determinant(l, u, n, &perm);
-	//printf("Determinant: %lf\n", det);
+	printf("Determinant: %lf\n", det);
+	
 	if(det == 0.0){
 		printf("ERROR: It is not possible to compute the inversion: determinant is equal to 0\n");
 		fclose(mat);
@@ -203,12 +212,13 @@ int main(int argc, char* argv[]) {
 		exit(1);
 	}
 	
-	/* Finding the inverse, result is stored into a_inv */
+	//Finding the inverse, result is stored into a_inv
 	for (i = 0; i < n; i++) {
         	forwardSubstitution(l, p, y, i, n); 			// y is filled
         	backwardSubstitution(u, y, a_inv, i, n);		// a_inv is filled
     	}
 	t = clock() - t;
+	/* END */
 	
 	resultFile = fopen("inverse.txt", "w");
 	printMatrix(a_inv, n, resultFile);

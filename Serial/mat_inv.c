@@ -1,3 +1,4 @@
+/* Starting pseudocodes/algorithm: https://www-dimat.unipv.it/sangalli/numerical_methods_eng_sciences/1%20-%20Linear%20Systems%20(part%20I).pdf */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,7 +13,10 @@ void backwardSubstitution(double **u, double *y, double **a_inv, int column, int
 void pivoting(double **a, double **p, int n, int *perm);
 void decomposition(double **l, double **u, int n);
 
-/* Reads a matrix from a file and stores it into the appropriate structure. */
+/*
+ * The file which contains a matrix has in its first row the dimensions
+ * then using fscanf each element of the matrix is stored on the memory allocated dynamically
+*/
 void readMatrix(double** matrix, FILE* file, int n) {
 	int i, j;
 
@@ -27,7 +31,7 @@ void readMatrix(double** matrix, FILE* file, int n) {
 	}
 }
 
-/* Stores a matrix into the file passed as argument */
+/* The opposite operation of readMatrix. Stores a matrix into a file, element by element */
 void printMatrix(double **matrix, int n, FILE* file) {
 	int i, j;
 
@@ -39,9 +43,10 @@ void printMatrix(double **matrix, int n, FILE* file) {
 	}
 }
 
-/* Becaute LU decomposition is used  det M = det LU = det L * det U, L and U are triangular
-   so the determinant is calculated as the product of the diagonal elements
- */
+/* 
+* Because LU decomposition is used, det M = det LU = det L * det U.
+* L and U are triangular so the determinant is calculated as the product of the diagonal elements
+*/
 double determinant(double **l, double **u, int n, int *perm) {
 	int i;
 	double det = 1;
@@ -50,7 +55,7 @@ double determinant(double **l, double **u, int n, int *perm) {
 		det *= l[i][i] * u[i][i];
 	}
 	
-	return pow(-1, perm[0]) * det;
+	return pow(-1, perm[0]) * det; //it is necessary to multiply the obtained the with (-1) raised to the number of permutation occurred in pivoting
 }
 
 /* Since L is a lower triangular matrix forward substitution is used to perform the calculus of Lx=y */
@@ -61,9 +66,9 @@ void forwardSubstitution(double **l, double **p, double *y, int column, int n) {
 	for (i = 0; i < n; i++) {
 		for (j = 0; j < i; j++) {
 			sum = sum + l[i][j] * y[j];
-        }
-        y[i] = (p[i][column] - sum) / l[i][i];
-        sum = 0;
+        	}
+        	y[i] = (p[i][column] - sum) / l[i][i];
+        	sum = 0;
 	}
 }
 
@@ -92,14 +97,14 @@ void pivoting(double **a, double **p, int n, int *perm) {
 	// k is column and j is row
 	for (k = 0; k < n-1; k++) {   
 		int imax = k;
-    	for (j = k; j < n; j++) { 	
+    		for (j = k; j < n; j++) { 	
 			if (a[j][k] > a[imax][k]) {  // finding the maximum index
 				imax = j;
-	            isMaximum = 1;
-	        }
-    	}
-    	if (isMaximum == 1) {
-    		// swapping a[k] and a[imax]
+	            		isMaximum = 1;
+	        	}
+    		}
+    		if (isMaximum == 1) {
+    			// swapping a[k] and a[imax]
 			memcpy(temp, a[k], n * sizeof(double));
 			memcpy(a[k], a[imax], n * sizeof(double));
 			memcpy(a[imax], temp, n * sizeof(double));
@@ -109,34 +114,32 @@ void pivoting(double **a, double **p, int n, int *perm) {
 			memcpy(p[k], p[imax], n * sizeof(double));
 			memcpy(p[imax], temp, n * sizeof(double));
 			
-	    	isMaximum = 0;
+	    		isMaximum = 0;
 			perm[0]++;
 		}
 	}
 	free(temp);
 }
 
-/* Perf LU decomposition of matrix M*/
+/* Perf LU decomposition of matrix M to obtain matrices L (lower) and U (upper) used to resolve and equation system throud BW and FW to obtain the inverse */
 void decomposition(double **l, double **u, int n) {
-    int i, j, k;
+	int i, j, k;
     
 	for (k = 0; k < n; k++) {
 		for (i = k + 1; i < n; i++) {
-            l[i][k] = u[i][k] / u[k][k];
-            for (j = k; j < n; j++) {
-            	u[i][j] = u[i][j] - l[i][k] * u[k][j];
-            }
-       	}
-    }
+           		 l[i][k] = u[i][k] / u[k][k];
+           		 for (j = k; j < n; j++) {
+            			u[i][j] = u[i][j] - l[i][k] * u[k][j];
+            		}
+       		}
+    	}
 }
 
 int main(int argc, char* argv[]) {
-	if(argc != 2) { //Checking parameters: 1.mat_inv.exe 2.matrix 
+	if(argc != 2) { //Checking parameters: 1.mat_inv.exe 2.matrix.txt
 		printf("Parameters error.\n");
 		exit(1);
 	}
-	
-	printf("This program compute the inverse of a squared matrix using only one thread\n");
 
 	FILE *mat, *resultFile;
 	clock_t t;
@@ -151,13 +154,13 @@ int main(int argc, char* argv[]) {
 		exit(1);
 	}
 	
-	int n = rows; /* matrix order (m is squared) */
+	int n = rows; //matrix order (m is squared)
 	double **m = (double **)malloc(n * sizeof(double*));
 	readMatrix(m, mat, n);
 
-	printf("\nThe matrix you have inserted is %dx%d and has %d elements\nPlease wait until computation are done...\n\n", n, n, n * n);
+	//printf("\nThe matrix you have inserted is %dx%d and has %d elements\nPlease wait until computation are done...\n\n", n, n, n * n);
 	
-	/* Create pivoting and inverse matrices and Matrices initialization */
+	/* Create pivoting and inverse matrices and matrices initialization */
 	double **a_inv = (double **)malloc(n * sizeof(double*));
 	double **p = (double **)malloc(n * sizeof(double*));
 	double **l = (double **)malloc(n * sizeof(double*));
@@ -182,22 +185,23 @@ int main(int argc, char* argv[]) {
 		l[i][i] = 1;
    	 }
     
-   	/* Starting LU algorithm */
+    	/* START */
 	t = clock();
 	
 	pivoting(a_p, p, n, &perm);
 	
-	for (i = 0; i < n; i++)
-		memcpy(u[i], a_p[i], n * sizeof(double));	// Fill u using a_p elements
-	
-    		decomposition(l, u, n);
+	for (i = 0; i < n; i++){
+		memcpy(u[i], a_p[i], n * sizeof(double)); // Fill u using a_p elements
+	}
+
+    	decomposition(l, u, n);
 	
 	double det = determinant(l, u, n, &perm);
 	printf("Determinant: %lf\n", det);
+	
 	if(det == 0.0) {
 		printf("ERROR: It is not possible to compute the inversion: determinant is equal to 0\n");
 		fclose(mat);
-		
 		for (i = 0; i < n; i++) {
 			free(p[i]);
 			free(a_p[i]);
@@ -221,7 +225,9 @@ int main(int argc, char* argv[]) {
         	forwardSubstitution(l, p, y, i, n); 			// y is filled
         	backwardSubstitution(u, y, a_inv, i, n);		// a_inv is filled
    	 }
+   	 
 	t = clock() - t;
+	/* END */
 	
 	resultFile = fopen("inverse.txt", "w");
 	printMatrix(a_inv, n, resultFile);
@@ -230,7 +236,6 @@ int main(int argc, char* argv[]) {
 
 	fclose(mat);
 	fclose(resultFile);
-	
 	for (i = 0; i < n; i++) {
 		free(p[i]);
 		free(a_p[i]);

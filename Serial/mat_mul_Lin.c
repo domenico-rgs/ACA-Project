@@ -1,3 +1,8 @@
+/* 
+* Same as in mat_mul.c but in this version we have tested the locality principle through the linearisation of the matrices.
+* Unfortunately this code appeared to be slow compared with the other probably for the compilator optimization.
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,8 +19,8 @@ void printMatrice(struct matrix* m, FILE* file);
 void matrixMul(struct matrix* m1, struct matrix* m2, struct matrix* m3);
 
 /*
-Knowing the number of rows and columns,
-it reads a matrix from a file and stores it in the appropriate structure.
+ * The file which contains a matrix has in its first row the dimensions
+ * then using fscanf each element of the matrix is stored on the memory allocated dynamically
 */
 void readMatrix(struct matrix* m, FILE* file) {
 	int i, j;
@@ -29,9 +34,7 @@ void readMatrix(struct matrix* m, FILE* file) {
 	}
 }
 
-/*
-The opposite operation to readMatrix. Saves a matrix in the file given as argument
-*/
+/* The opposite operation of readMatrix. Stores a matrix into a file, element by element */
 void printMatrix(struct matrix* m, FILE* file) {
 	int i, j;
 
@@ -44,8 +47,10 @@ void printMatrix(struct matrix* m, FILE* file) {
 }
 
 /*
-Performs the multiplication operation between the matrices m1 and m2.
-The result will be stored in the matrix m3.
+ * Performs the multiplication operation between the matrices m1 and m2.
+ * The result will be stored in the matrix m3.
+ * The algorithm is practically the one that can be found here: https://en.wikipedia.org/wiki/Matrix_multiplication#Definition
+ * Calculus are done with a summation for each element of the result matrices, each element with its summation are calculated in a serial way
 */
 void matrixMul(struct matrix* m1, struct matrix* m2, struct matrix* m3) {
 	int i, j, k;
@@ -53,25 +58,20 @@ void matrixMul(struct matrix* m1, struct matrix* m2, struct matrix* m3) {
 	m3->nrows = m1->nrows;
 	m3->ncols = m2->ncols;
 
-	//dynamically allocates the m3-matrix to be used to save the result
 	m3->mat = (double*)malloc(m3->nrows * m3->ncols * sizeof(double));
-	memset(m3->mat, 0, m3->nrows * m3->ncols * sizeof(double)); //set the memory allocated to the m3 matrix to zero
+	memset(m3->mat, 0, m3->nrows * m3->ncols * sizeof(double));
 
-	clock_t t = clock();
-	//classical multiplication done with a summation
 	for (i = 0; i < m1->nrows; i++) {
 		for (j = 0; j < m2->ncols; j++) {
 			for (k = 0; k < m1->ncols; k++) { 
-				m3->mat[i * m3->ncols + j] += m1->mat[i*m1->ncols+k] * m2->mat[k*m2->ncols+j]; //"Linearisation" of matrices is used to achieve faster access due to the principle of access locality.
+				m3->mat[i * m3->ncols + j] += m1->mat[i*m1->ncols+k] * m2->mat[k*m2->ncols+j];
 			}
 		}
 	}
-	t = clock() - t;
-	printf("time: %f seconds\n", ((double)t)/CLOCKS_PER_SEC);
 }
 
 int main(int argc, char* argv[]) {
-	if(argc != 3){ //1- exe name, 2- mat1, 3- mat2
+	if(argc != 3){ //1- exe name, 2- mat1.txt, 3- mat2.txt
 		printf("Parameter error.\n");
 		exit(1);
 	}
@@ -85,7 +85,7 @@ int main(int argc, char* argv[]) {
 	fscanf(mat1, "%d %d", &m1.nrows, &m1.ncols);
 	fscanf(mat2, "%d %d", &m2.nrows, &m2.ncols);
 
-	//Multiplication is permitted if m1 is m x n and m2 is n x p.
+	/* Multiplication is permitted if m1 is m x n and m2 is n x p, m1 must have the same number of column of the rows of m2 matrix */
 	if(m1.ncols != m2.nrows){
 		printf("It is not possible to do matrix multiplication. Check matrix number of rows and cols.\n");
 		fclose(mat1);
@@ -98,7 +98,7 @@ int main(int argc, char* argv[]) {
 
 	t = clock();
 	matrixMul(&m1, &m2, &m3);
-	t = clock() - t; //total time spent in matrixMul
+	t = clock() - t; //total time spent in matrixMul (wall clock time)
 
 	resultFile = fopen("result.txt", "w");
 	printMatrix(&m3, resultFile);

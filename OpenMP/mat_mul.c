@@ -8,8 +8,8 @@ void printMatrix(double** m, FILE* file, int rows, int cols);
 void matrixMul(double** m1, double** m2, double** m3, int m, int p);
 
 /*
- * Knowing the number of rows and columns,
- * it reads a matrix from a file and stores it in the appropriate structure.
+ * The file which contains a matrix has in its first row the dimensions
+ * then using fscanf each element of the matrix is stored on the memory allocated dynamically
 */
 void readMatrix(double** m, FILE* file, int rows, int cols) {
 	int i, j;
@@ -25,9 +25,7 @@ void readMatrix(double** m, FILE* file, int rows, int cols) {
 	}
 }
 
-/*
- * The opposite operation of readMatrix. Stores a matrix into the file passed as argument
-*/
+/* The opposite operation of readMatrix. Stores a matrix into a file, element by element */
 void printMatrix(double** m, FILE* file, int rows, int cols) {
 	int i, j;
 
@@ -42,6 +40,7 @@ void printMatrix(double** m, FILE* file, int rows, int cols) {
 /*
  * Performs the multiplication operation between the matrices m1 and m2.
  * The result will be stored in the matrix m3.
+ * The algorithm is practically the one that can be found here: https://en.wikipedia.org/wiki/Matrix_multiplication#Definition
 */
 void matrixMul(double** m1, double** m2, double** m3, int m, int p) {
 	int i, j, k;
@@ -53,11 +52,11 @@ void matrixMul(double** m1, double** m2, double** m3, int m, int p) {
 	
 	#pragma omp parallel shared(m1, m2, m3) private(i, j, k)
 	{
-		#pragma omp for schedule (dynamic)
+		#pragma omp for schedule (dynamic) //the iterations of the first for loop are shared among threads, this means that each thread calculates a row of the resulting matrix
 		for (i = 0; i < m; i++) {
 			for (j = 0; j < p; j++) {
 				for (k = 0; k < p; k++) { 
-					m3[i][j] += m1[i][k] * m2[k][j];
+					m3[i][j] += m1[i][k] * m2[k][j]; //there are no data races since each thread access independetly to only one m3 element at a time
 				}	
 			}
 		}
@@ -65,7 +64,7 @@ void matrixMul(double** m1, double** m2, double** m3, int m, int p) {
 }
 
 int main(int argc, char* argv[]) {
-	if(argc != 3){ //1- exe name, 2- mat1, 3- mat2
+	if(argc != 3){ //1- exe name, 2- mat1.txt, 3- mat2.txt
 		printf("Parameter error.\n");
 		exit(1);
 	}
@@ -79,7 +78,7 @@ int main(int argc, char* argv[]) {
 	fscanf(mat1, "%d %d", &m, &n1);
 	fscanf(mat2, "%d %d", &n2, &p);
 
-	/* Multiplication is permitted if m1 is m x n and m2 is n x p */
+	/* Multiplication is permitted if m1 is m x n and m2 is n x p, m1 must have the same number of column of the rows of m2 matrix */
 	if(n1 != n2) {
 		printf("It is not possible to do matrix multiplication. Check matrix number of rows and cols.\n");
 		fclose(mat1);
@@ -96,7 +95,7 @@ int main(int argc, char* argv[]) {
 	
 	t = omp_get_wtime();
 	matrixMul(m1, m2, m3, m, p);
-	t = omp_get_wtime() - t; // total time spent in matrixMul
+	t = omp_get_wtime() - t; //total time spent in matrixMul (wall clock time)
 
 	resultFile = fopen("result.txt", "w");
 	printMatrix(m3, resultFile, m, p);

@@ -12,7 +12,10 @@ void backwardSubstitution(double **u, double *y, double **a_inv, int column, int
 void pivoting(double **a, double **p, int n, int *perm);
 void decomposition(double **l, double **u, int n);
 
-/* Reads a matrix from a file and stores it into the appropriate structure. */
+/*
+ * The file which contains a matrix has in its first row the dimensions
+ * then using fscanf each element of the matrix is stored on the memory allocated dynamically
+*/
 void readMatrix(double** matrix, FILE* file, int n) {
 	int i, j;
 
@@ -27,7 +30,7 @@ void readMatrix(double** matrix, FILE* file, int n) {
 	}
 }
 
-/* Stores a matrix into the file passed as argument */
+/* The opposite operation of readMatrix. Stores a matrix into a file, element by element */
 void printMatrix(double **matrix, int n, FILE* file) {
 	int i, j;
 
@@ -39,21 +42,22 @@ void printMatrix(double **matrix, int n, FILE* file) {
 	}
 }
 
-/* Becaute LU decomposition is used  det M = det LU = det L * det U, L and U are triangular
-   so the determinant is calculated as the product of the diagonal elements
- */
+/* 
+* Because LU decomposition is used, det M = det LU = det L * det U.
+* L and U are triangular so the determinant is calculated as the product of the diagonal elements
+*/
 double determinant(double **l, double **u, int n, int *perm) {
 	int i;
 	double det = 1;
 	
 	#pragma omp parallel
 	{
-		#pragma omp for reduction(*: det)
+		#pragma omp for reduction(*: det) //to speedup computation we apply the reduction to det. In this way the iteration are distributed among threads and at the end the final det value is calculated with a parallel reduction
 		for(i = 0; i < n; i++) 
 			det *= l[i][i] * u[i][i];
 	}
 	
-	return pow(-1, perm[0]) * det;
+	return pow(-1, perm[0]) * det; //it is necessary to multiply the obtained the with (-1) raised to the number of permutation occurred in pivoting
 }
 
 /* Since L is a lower triangular matrix forward substitution is used to perform the calculus of Lx=y */
@@ -62,7 +66,7 @@ void forwardSubstitution(double **l, double **p, double *y, int column, int n) {
 	double sum = 0;
 	
 	for (i = 0; i < n; i++) {
-		//#pragma omp parallel for reduction(+:sum)
+		//#pragma omp parallel for reduction(+:sum) //another way of parallelizing spreading the work for each linear equation among threads but it is better to do a parallelizazione as done in the for loop in main
 		for (j = 0; j < i; j++) {
 			sum = sum + l[i][j] * y[j];
         	}
@@ -79,7 +83,7 @@ void backwardSubstitution(double **u, double *y, double **a_inv, int column, int
 	a_inv[n-1][column] = y[n-1] / u[n-1][n-1];
 	for (i = n - 2; i >= 0; i--) {
 		sum = y[i];
-		//#pragma omp parallel for reduction(+:sum)
+		//#pragma omp parallel for reduction(+:sum) //as above
 		for (j = n - 1; j > i; j--) {
 			sum = sum - u[i][j] * a_inv[j][column];
        		 }
@@ -95,7 +99,6 @@ void pivoting(double **a, double **p, int n, int *perm) {
 	double *temp = (double*)malloc(n * sizeof(double));
     	
 	// k is column and j is row
-	//#pragma omp parallel firstprivate(isMaximum) private(j,k) schedule(dynamic)
 	for (k = 0; k < n-1; k++) {   
 		int imax = k;
     		for (j = k; j < n; j++) { 	
@@ -117,39 +120,35 @@ void pivoting(double **a, double **p, int n, int *perm) {
 			
 	    		isMaximum = 0;
 	    		
-	    		//#pragma omp atomic
 			perm[0]++;
 		}
 	}
 	free(temp);
 }
 
-/* Perf LU decomposition of matrix M*/
+/* Perf LU decomposition of matrix M to obtain matrices L (lower) and U (upper) used to resolve and equation system throud BW and FW to obtain the inverse */
 void decomposition(double **l, double **u, int n) {
     int i, j, k;
     
     	#pragma omp parallel private (i,j,k)
     	{
-		for (k = 0; k < n; k++) {
-			#pragma omp for schedule(static)
+		for (k = 0; k < n; k++) { //u is shared, parallelizing this for loop is not possibile because otherwise there will be data races with u
+			#pragma omp for schedule(static) //computation of rows of l and u are done in parallel with different threads
 			for (i = k + 1; i < n; i++) {
             			l[i][k] = u[i][k] / u[k][k];
             			for (j = k; j < n; j++) {
             				u[i][j] = u[i][j] - l[i][k] * u[k][j];
            			 }	
       	 		}
-      	 		#pragma omp barrier
    		 }
    	 }
 }
 
 int main(int argc, char* argv[]) {
-	if(argc != 2) { //Checking parameters: 1.mat_inv.exe 2.matrix 
+	if(argc != 2) { //Checking parameters: 1.mat_inv.exe 2.matrix.txt
 		printf("Parameters error.\n");
 		exit(1);
 	}
-
-	printf("This program compute the inverse of a squared matrix using only one thread\n");
 
 	FILE *mat, *resultFile;
 	double t;
@@ -164,20 +163,20 @@ int main(int argc, char* argv[]) {
 		exit(1);
 	}
 	
-	int n = rows; /* matrix order (m is squared) */
+	int n = rows; //matrix order (m is squared)
 	double **m = (double **)malloc(n * sizeof(double*));
 	readMatrix(m, mat, n);
 
-	printf("\nThe matrix you have inserted is %dx%d and has %d elements\nPlease wait until computation are done...\n\n", n, n, n * n);
+	//printf("\nThe matrix you have inserted is %dx%d and has %d elements\nPlease wait until computation are done...\n\n", n, n, n * n);
 	
-	/* Create pivoting and inverse matrices and Matrices initialization */
+	/* Create pivoting and inverse matrices and matrices initialization */
 	double **a_inv = (double **)malloc(n * sizeof(double*));
 	double **p = (double **)malloc(n * sizeof(double*));
 	double **l = (double **)malloc(n * sizeof(double*));
 	double **a_p = (double **)malloc(n * sizeof(double*));
 	double **u = (double **)malloc(n * sizeof(double*));
 
-	#pragma omp parallel for
+	#pragma omp parallel for //spread initialization work but it not speedup a lot the code so it was ignored in wall clock time measures
 	for(i = 0; i < n; i++) { 
 		a_inv[i] = (double *)malloc(n * sizeof(double));
 		p[i] = (double *)malloc(n * sizeof(double));
@@ -195,7 +194,7 @@ int main(int argc, char* argv[]) {
 		l[i][i] = 1;
 	}
     
-   	/* Starting LU algorithm */
+   	/* START */
 	t = omp_get_wtime();	
 	pivoting(a_p, p, n, &perm);
 
@@ -208,10 +207,10 @@ int main(int argc, char* argv[]) {
 
 	double det = determinant(l, u, n, &perm);
 	printf("Determinant: %lf\n", det);
+	
 	if(det == 0.0) {
 		printf("ERROR: It is not possible to compute the inversion: determinant is equal to 0\n");
 		fclose(mat);
-		
 		for (i = 0; i < n; i++) {
 			free(p[i]);
 			free(a_p[i]);
@@ -241,7 +240,7 @@ int main(int argc, char* argv[]) {
 	    	}
 	}
 	t = omp_get_wtime() - t;
-	
+	/* STOP */
 	resultFile = fopen("inverse.txt", "w");
 	printMatrix(a_inv, n, resultFile);
 

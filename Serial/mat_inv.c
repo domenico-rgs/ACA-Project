@@ -55,7 +55,7 @@ double determinant(double **l, double **u, int n, int *perm) {
 		det *= l[i][i] * u[i][i];
 	}
 	
-	return pow(-1, perm[0]) * det; //it is necessary to multiply the obtained the with (-1) raised to the number of permutation occurred in pivoting
+	return pow(-1, perm[0]) * det; //it is necessary to multiply the obtained det with (-1) raised to the number of permutation occurred in pivoting
 }
 
 /* Since L is a lower triangular matrix forward substitution is used to perform the calculus of Lx=y */

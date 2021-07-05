@@ -19,7 +19,7 @@ __global__ void determinant(double *l, double *u, int n, double *det, int perm);
 __device__ void forwardSubstitution(double *d_l, double *d_p, double *d_y, int column, int n);
 __device__ void backwardSubstitution(double *d_u, double *d_y, double *d_a_inv, int column, int n);
 void pivoting(double *a, double *p, int n, int *perm);
-void decomposition(double *l, double *u, int n);
+__global__ void decomposition(double *d_l, double *d_u, int n, int k);
 __device__ double atomicMul(double* address, double val);
 __global__ void fillInVectors(double *d_p, double *d_l, int n);
 __global__ void inverse(double *d_l,double *d_p, double *d_u, double *d_a_inv, double *d_y, int n);
@@ -155,19 +155,18 @@ void pivoting(double *a, double *p, int n, int *perm) {
 }
 
 /* 
-* Perf LU decomposition of matrix M to obtain matrices L (lower) and U (upper) used to resolve and equation system throud BW and FW to obtain the inverse. It is performed by the host because the parallelization is complex and could add overhead.
+* Perf LU decomposition of matrix M to obtain matrices L (lower) and U (upper) used to resolve and equation system throud BW and FW to obtain the inverse. It could add overhead due to the for loop from which is called in main
 */
-void decomposition(double *l, double *u, int n) {
-    int i, j, k;
+__global__ void decomposition(double *d_l, double *d_u, int n, int k) {
+    int j;
+    int i = blockIdx.x*blockDim.x+threadIdx.x;	
     
-	for (k = 0; k < n; k++) {
-        	for (i = k + 1; i < n; i++) {
-            			l[i * n + k] = u[i * n + k] / u[k * n + k];
-            		for (j = k; j < n; j++) {
-                		u[i * n + j] = u[i * n + j] - l[i * n + k] * u[k * n + j];
-            		}
-        	}
-    	}
+	if(i>=k+1 && i<n){
+            	l[i * n + k] = u[i * n + k] / u[k * n + k];
+            	for (j = k; j < n; j++) {
+                	u[i * n + j] = u[i * n + j] - l[i * n + k] * u[k * n + j];
+            	}
+        }
 }
 
 /*
@@ -218,7 +217,7 @@ __device__ void backwardSubstitution(double *d_u, double *d_y, double *d_a_inv, 
 }
 
 int main(int argc, char* argv[]) {
-	if(argc != 2) { //Checking parameters: 1.mat_inv.exe 2.matrix.txt
+	if(argc != 2) { //Checking parameters: 1.mat_inv.exe 2.matrix
 		printf("Parameters error.\n");
 		exit(1);
 	}
@@ -280,24 +279,23 @@ int main(int argc, char* argv[]) {
 	
 	fillInVectors <<<dimGridLinear, dimBlockLinear>>>(d_p, d_l, n);
 	
-	cudaMemcpy(l, d_l, n*n*sizeof(double), cudaMemcpyDeviceToHost);
 	cudaMemcpy(p, d_p, n*n*sizeof(double), cudaMemcpyDeviceToHost);
 	cudaDeviceSynchronize();
 	
 	t = clock();
 	pivoting(a_p, p, n, &perm);
 
-	memcpy(u, a_p, n * n * sizeof(double));	//Fill u using a_p elements
+	cudaMemcpy(d_u, a_p, n * n * sizeof(double), cudaMemcpyHostToDevice);	//Fill u using a_p elements
 
-    	decomposition(l, u, n);
-	
-	cudaMemcpy(d_l, l, n * n * sizeof(double), cudaMemcpyHostToDevice);
-	cudaMemcpy(d_u, u, n * n * sizeof(double), cudaMemcpyHostToDevice);
+	//probably it will add overhead due to the multiple kernel calls
+    	for(i=0; i<n; i++){
+    	    	decomposition<<<dimGridLinear, dimBlockLinear>>>(d_l, d_u, n, i);
+    	    	cudaDeviceSynchronize();
+    	}
 
 	determinant <<<dimGridLinear, dimBlockLinear>>>(d_l, d_u, n, d_det, perm);
 
 	cudaMemcpy(&det, d_det, sizeof(double), cudaMemcpyDeviceToHost);
-
 	cudaDeviceSynchronize();
 
 	printf("Determinant: %lf\n", det);
@@ -320,7 +318,6 @@ int main(int argc, char* argv[]) {
 	}
 
 	cudaMemcpy(d_p, p, n * n * sizeof(double), cudaMemcpyHostToDevice);
-	cudaMemcpy(d_a_inv, a_inv, n * n * sizeof(double), cudaMemcpyHostToDevice);
 
 	inverse <<<dimGridLinear, dimBlockLinear>>>(d_l, d_p, d_u, d_a_inv, d_y, n);
 	cudaDeviceSynchronize();
